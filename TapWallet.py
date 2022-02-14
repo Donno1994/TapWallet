@@ -2242,7 +2242,7 @@ def thread_balance():
 
 #Init some Objects
 root = tk.Tk()
-root.title("TapRoot Wallet")
+root.title("TapRoot Wallet by https://twitter.com/BR_Robin . Only testnet recommended")
 
 
 
