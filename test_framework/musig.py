@@ -34,7 +34,6 @@ def generate_musig_key(pubkey_list):
     for key in pubkey_list:
         musig_c[key] = hashlib.sha256(Lh + key.get_bytes()).digest()
         aggregate_key += key.mul(musig_c[key])
-        counter=counter+1
     return musig_c, aggregate_key
 
 def aggregate_schnorr_nonces(nonce_point_list):
