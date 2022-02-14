@@ -1,4 +1,24 @@
-                    GNU GENERAL PUBLIC LICENSE
+    TapWallet - A wallet which can create keypath and scriptpath payments
+
+    © 2022 February - https://twitter.com/BR_Robin
+    This project uses the following open source libraries:
+    https://github.com/bitcoin/bitcoin/tree/master/test/functional/test_framework
+    https://github.com/bitcoinops/taproot-workshop/tree/master/test_framework
+    https://github.com/1200wd/bitcoinlib
+    
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as
+    published by the Free Software Foundation, either version 3 of the
+    License, or (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+
+
+                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
 
  Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/>
