@@ -428,8 +428,10 @@ class c_Container_PubKey (c_Container):
 	def doubleClick(self,event):
 		
 		self.scriptWindow = Toplevel(self.root)
-		self.scriptWindow.title("Create Script")
+		self.scriptWindow.title("Create Script or Taproot")
 		self.scriptWindow.geometry("600x400")
+
+		
 
 		label1=Label(self.scriptWindow,text="Public Key:    "+str(self.label)+":")
 		label1.pack()
@@ -442,45 +444,40 @@ class c_Container_PubKey (c_Container):
 		e.pack()
 		e.place(x=150,y=17,width=400)
 
-		#tabControl=ttk.Notebook(self.scriptWindow)
-		#self.tab1=Frame(tabControl)
-		#self.tab2=Frame(tabControl)
+		scriptFrame = tk.LabelFrame(self.scriptWindow)
+		scriptFrame.pack()
+		scriptFrame.place(height=265,width=590, x=5,y=60)
 
-		#tabControl.add(self.tab1, text='Scripts')
-		#tabControl.add(self.tab2, text='MultiSig')
-		#tabControl.pack(expand=1, fill="both")
-		#tabControl.place(height=500,width=800,x=10,y=50)
-
-		label=Label(self.scriptWindow,text="Create a script of the above key to specify spending conditions")
+		label=Label(scriptFrame,text="Create a script of the above key to specify spending conditions")
 		label.pack()
-		label.place(x=5,y=60,anchor="nw")
-		labelLabel=tk.Label(self.scriptWindow,text="Add a label to script:")
+		label.place(x=5,y=0,anchor="nw")
+		labelLabel=tk.Label(scriptFrame,text="Add a label to script:")
 		labelLabel.pack()
-		labelLabel.place(height=15,x=5,y=90)
+		labelLabel.place(height=15,x=5,y=30)
 		
-		self.editLabel=tk.Entry(self.scriptWindow)
+		self.editLabel=tk.Entry(scriptFrame)
 		self.editLabel.pack()
-		self.editLabel.place(height=15,width=80,x=150,y=90)
+		self.editLabel.place(height=15,width=80,x=150,y=30)
 		self.editLabel.insert(0,str(self.label))
 
-		labelTimelock=tk.Label(self.scriptWindow,text="Add a timelock to script:")
+		labelTimelock=tk.Label(scriptFrame,text="Add a timelock to script:")
 		labelTimelock.pack()
-		labelTimelock.place(height=15,x=5,y=115)
+		labelTimelock.place(height=15,x=5,y=55)
 
 		self.radioTimelockVar=IntVar(value=1)
-		radioTimelock0=tk.Radiobutton(self.scriptWindow,text="No Timelock",variable=self.radioTimelockVar,value=1,command=self.showNoTimelock)
+		radioTimelock0=tk.Radiobutton(scriptFrame,text="No Timelock",variable=self.radioTimelockVar,value=1,command=self.showNoTimelock)
 		radioTimelock0.pack()
-		radioTimelock0.place(x=150,y=113)
-		radioTimelock1=tk.Radiobutton(self.scriptWindow,text="Relative Timelock",variable=self.radioTimelockVar,value=2,command=self.showRelTimelock)
+		radioTimelock0.place(x=150,y=53)
+		radioTimelock1=tk.Radiobutton(scriptFrame,text="Relative Timelock",variable=self.radioTimelockVar,value=2,command=self.showRelTimelock)
 		radioTimelock1.pack()
-		radioTimelock1.place(x=250,y=113)
-		radioTimelock2=tk.Radiobutton(self.scriptWindow,text="Absolute Timelock",variable=self.radioTimelockVar,value=3,command=self.showAbsTimelock)
+		radioTimelock1.place(x=250,y=53)
+		radioTimelock2=tk.Radiobutton(scriptFrame,text="Absolute Timelock",variable=self.radioTimelockVar,value=3,command=self.showAbsTimelock)
 		radioTimelock2.pack()
-		radioTimelock2.place(x=380,y=113)
+		radioTimelock2.place(x=380,y=53)
 
-		self.containerRelTimelock= tk.LabelFrame(self.scriptWindow,borderwidth=0)
+		self.containerRelTimelock= tk.LabelFrame(scriptFrame,borderwidth=0)
 		self.containerRelTimelock.pack()
-		#self.containerRelTimelock.place(height=75,width=400,x=5,y=150)
+		
 
 		labelRelTimelock=tk.Label(self.containerRelTimelock,text="When the address receives funds, this script can only\nspend them after you wait the specified amount of blocks")
 		labelRelTimelock.pack()
@@ -494,7 +491,7 @@ class c_Container_PubKey (c_Container):
 		self.editRelTimelock.pack()
 		self.editRelTimelock.place(height=15,width=50,x=177,y=40)
 
-		self.containerAbsTimelock= tk.LabelFrame(self.scriptWindow,borderwidth=0)
+		self.containerAbsTimelock= tk.LabelFrame(scriptFrame,borderwidth=0)
 		self.containerAbsTimelock.pack()
 		#self.containerAbsTimelock.place(height=50,width=400,x=5,y=150)
 
@@ -510,13 +507,25 @@ class c_Container_PubKey (c_Container):
 		self.editAbsTimelock.pack()
 		self.editAbsTimelock.place(height=15,width=50,x=275,y=42)
 		
-		labelPassword=tk.Label(self.scriptWindow,text="Add a password to script: <<Not supported yet>>")
+		labelPassword=tk.Label(scriptFrame,text="Add a password to script: <<Not supported yet>>")
 		labelPassword.pack()
-		labelPassword.place(height=15,x=5,y=220)
+		labelPassword.place(height=15,x=5,y=160)
 
-		buttonScript=tk.Button(self.scriptWindow,text="Create Script", command=self.createScript)
+		buttonScript=tk.Button(scriptFrame,text="Create Script", command=self.createScript,bg="#DC7A7A")
 		buttonScript.pack()
-		buttonScript.place(height=15,width=100,x=5,y=315)
+		buttonScript.place(height=20,width=100,x=5,y=235)
+
+		taprootFrame = tk.LabelFrame(self.scriptWindow)
+		taprootFrame.pack()
+		taprootFrame.place(height=60,width=590, x=5,y=330)
+
+		buttonTaprootAddress=tk.Button(taprootFrame,text="Create Taproot", command=lambda:gui.calcKeyReleasedTapRoot(key=self),bg="#47C718")
+		buttonTaprootAddress.pack()
+		buttonTaprootAddress.place(height=20,width=100,x=5,y=20)
+
+		labelInfo=tk.Label(taprootFrame,text="Creating a taproot address from this key\nwill delete all other scripts and keys\napart from parent keys")
+		labelInfo.pack()
+		labelInfo.place(x=120,y=5)
 
 		self.LabelErrorTimeLock=tk.Label(self.scriptWindow,text="",fg="#FF0000")
 		self.LabelErrorTimeLock.pack()
@@ -531,12 +540,12 @@ class c_Container_PubKey (c_Container):
 
 	def showRelTimelock(self):
 		self.containerAbsTimelock.place_forget()
-		self.containerRelTimelock.place(height=75,width=400,x=150,y=140)
+		self.containerRelTimelock.place(height=75,width=400,x=150,y=80)
 		self.editAbsTimelock.delete(0, 'end')
 
 	def showAbsTimelock(self):
 		self.containerRelTimelock.place_forget()
-		self.containerAbsTimelock.place(height=75,width=400,x=150,y=140)
+		self.containerAbsTimelock.place(height=75,width=400,x=150,y=80)
 		self.editRelTimelock.delete(0, 'end')
 
 
@@ -620,8 +629,6 @@ class c_Container_Script(c_Container):
 		self.scriptWindow = Toplevel(self.root)
 		self.scriptWindow.title("See Script Details")
 		self.scriptWindow.geometry("650x120")
-		#if(isinstance(self,c_Container_PubKey)):color="#0099FF"
-	#		if(isinstance(self,c_Container_Script)):color="#DC7A7A"
 
 		label=Label(self.scriptWindow,text="Script:    "+str(self.label)+":")
 		label.pack()
@@ -930,9 +937,17 @@ class GraphicalUserInterfaceCanvas:
 
 		root.geometry("1470x900")
 
-	
-		
-	def calcKeyReleasedTapRoot(self):
+
+	def calcKeyReleasedTapRoot(self,key=0):
+
+		if(self.TapRootContainer):
+			console.printText("You must delete your taproot address before creating new scripts,keys or a new address")
+			return#If a Taproot address already exists, stop creating other containers
+
+		if(key!=0):
+			selectedContainer.clear()
+			selectedContainer.append(key)
+
 		rootKey=None
 		merkle=None
 
@@ -968,11 +983,6 @@ class GraphicalUserInterfaceCanvas:
 
 
 		self.TapRootContainer=c_Container_Taproot(x,y,rootKey,merkle)
-		
-		#self.TapRootContainer=c_Container_Taproot(self.container_Script,400,300,self.editLabel.get(),taprootObject,segwit_address,parentArray,tweaked_privkey)
-		#gui.taprootContainerArray.append(self.TapRootContainer)
-		
-
 		thread_balance()
 		guiTX.selectSigningMethod()
 
@@ -981,7 +991,8 @@ class GraphicalUserInterfaceCanvas:
 			selectedContainer[a-1].flag(event=None)
 		
 
-		self.scriptWindow.destroy()
+		if(key==0):self.scriptWindow.destroy()
+		else: key.scriptWindow.destroy()
 
 
 	def calcKeyReleasedMultiSig(self):
@@ -1042,7 +1053,9 @@ class GraphicalUserInterfaceCanvas:
 
 		if (event.keycode==17):#control key released
 
-			if(self.TapRootContainer):return#If a Taproot address already exists, stop creating other containers
+			if(self.TapRootContainer):
+				console.printText("You must delete your taproot address before creating new scripts,keys or a new address")
+				return#If a Taproot address already exists, stop creating other containers
 
 			pubKeyCounter=0
 			hashCounter=0
@@ -1104,7 +1117,7 @@ class GraphicalUserInterfaceCanvas:
 				labelLabel.config(text="You are going to create a Taproot Address now.                         \n"+
 								       "All public keys, scripts and hashes which are not part of the address  \n"+
 								       "will be removed to make clear what is part of the address and what not.")
-				buttonScript=tk.Button(self.scriptWindow,text="Create TapRoot", command=self.calcKeyReleasedTapRoot)
+				buttonScript=tk.Button(self.scriptWindow,text="Create TapRoot", command=self.calcKeyReleasedTapRoot,bg="#47C718")
 				
 			elif pubKeyCounter>1 and hashCounter==0:
 				
