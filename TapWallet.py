@@ -430,9 +430,7 @@ class c_Container_PubKey (c_Container):
 		self.scriptWindow = Toplevel(self.root)
 		self.scriptWindow.title("Create Script or Taproot")
 		self.scriptWindow.geometry("600x400")
-
 		
-
 		label1=Label(self.scriptWindow,text="Public Key:    "+str(self.label)+":")
 		label1.pack()
 		label1.place(x=5,y=15,anchor="nw")
@@ -1582,12 +1580,12 @@ class GraphicalUserInterfaceTX:
 							self.PathValueArray2.append(PathValue2)
 							counter2+=1
 						else:
-							text="Key of "+gui.TapRootContainer.internalKey.parentArray[o].label+": "+shortenHexString(str(gui.TapRootContainer.internalKey.parentArray[o].pubKey))
+							text="Key of "+pubkeyContainer.parentArray[o].label+": "+shortenHexString(str(pubkeyContainer.parentArray[o].pubKey))
 					
 							chkbutton=tk.Checkbutton(self.PathContainer,text=text,state=DISABLED)
 							chkbutton.pack();chkbutton.place(height=40,x=14,y=counterY)
 							#chkbutton.bind('<Button-3>',lambda x:console.copyText(str(gui.TapRootContainer.internalKey.parentArray[o].pubKey)))
-							chkbutton.bind('<Button-3>',make_lambda(str(gui.TapRootContainer.internalKey.parentArray[o].pubKey)))
+							chkbutton.bind('<Button-3>',make_lambda(str(pubkeyContainer.parentArray[o].pubKey)))
 							counterY+=27
 							counter2+=1
 				
