@@ -7,12 +7,6 @@ from random import *
 from threading import *
 import inspect
 
-#from MyWallet import *
-#from test_framework.messages import sha256
-#from test_framework.script import tagged_hash, Tapbranch, TapTree, TapLeaf, CScript, TaprootSignatureHash, OP_CHECKSIG, SIGHASH_ALL_TAPROOT
-
-
-
 import bitcoin_core_framework as bitcoin_core
 from test_framework import *
 from bitcoinlib.services.services import *
@@ -1756,15 +1750,63 @@ class GraphicalUserInterfaceTX:
 
 		return destination_list
 
+	def broadcastWindow(self,tx):
+
+		publishWindow = Toplevel(self.root)
+		publishWindow.title("Publish Transaction")
+		publishWindow.geometry("500x300")
+
+
+		label=Label(publishWindow,text="Raw TX:")
+		label.pack()
+		label.place(x=5,y=10)
+
+		textArea=tk.Text(publishWindow,font=('arial',11, 'italic'))
+		textArea.pack()
+		textArea.place(height=200,width=450, x=5,y=30)
+		textArea.delete(1.0, 'end')
+		
+		textArea.insert(1.0,str(tx))
+		textArea.configure(state='disabled')
+
+		#label1=Label(publishWindow,text="Raw TX:    "+str(tx2))
+		#label1.pack()
+		#label1.place(height=200,width=500,x=5,y=15)
+
+		button=tk.Button(publishWindow,text="Broadcast Transaction", command=lambda: self.broadcastTX(tx))
+		button.pack()
+		button.place(x=5,y=260)
+
+	def broadcastTX(self,tx):
+		
+		
+
+		if(mainnet):res=Service().sendrawtransaction(rawtx=tx)
+		else: res=service_testnet.sendrawtransaction(rawtx=tx)
+
+	    
+		#console.printText(text="\nTried to send tx. It's'",keepOld=True)
+		
+		print(res)
+		if(res==False):
+			console.printText(text="\nError when broadcasting tx. No response",keepOld=True)
+			return
+
+		
+		#a=res['response_dict']
+		if "txid" in res:
+			console.printText(text="\nTx ID: "+res['txid'],keepOld=True)
+		else: console.printText(text="\nError when broadcasting tx. Unknown response",keepOld=True)
+		
+
 	def createTX(self):
 
 		if(self.keyPathChosen):
 			if(len(self.PathValueArray)==1):#KeyPath Single Key
-				
-				
-				
+
 				tx=tapTree.SpendTransactionViaKeyPath(gui.TapRootContainer,self.get_destinationList())
 				console.printText(text="Signed Raw Transaction:\n"+str(tx))
+				self.broadcastWindow(tx)
 
 			if(len(self.PathValueArray)>1):#KeyPath MultiSig
 				
@@ -1781,7 +1823,7 @@ class GraphicalUserInterfaceTX:
 			tx=tapTree.SpendTransactionViaScriptPath(gui.TapRootContainer,self.get_destinationList(),pubContainer.privKey,
 							self.tx_scriptContainer.script,self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock)
 			console.printText(text="Signed Raw Transaction:\n"+str(tx))
-			
+			self.broadcastWindow(tx)
 			return
 
 		self.multisigContainer(multisig_key=pubContainer)
@@ -1825,13 +1867,13 @@ class GraphicalUserInterfaceTX:
 
 			self.windowMultiSig = Toplevel(self.root)
 			self.windowMultiSig.title("Create MultiSig Transaction")
-			self.windowMultiSig.geometry("700x450")
+			self.windowMultiSig.geometry("720x470")
 
 			Label(self.windowMultiSig,text ="Create MultiSig Transaction").pack()
 
 			self.page1=tk.LabelFrame(self.windowMultiSig)
 			self.page1.pack()
-			self.page1.place(height=200,width=550, x=10, y=50)
+			self.page1.place(height=800,width=700, x=10, y=50)
 
 			label_noncehash=Label(self.page1,text ="Share nonce hash with partner")
 			label_noncehash.pack()
@@ -1841,7 +1883,7 @@ class GraphicalUserInterfaceTX:
 
 			button_next=tk.Button(self.page1,text="Next", command=self.multisig_page2)
 			button_next.pack()
-			button_next.place(x=500,y=170)
+			button_next.place(x=600,y=30)
 		
 		if(self.keyPathChosen):
 			for i in range(1,len(self.PathValueArray)):
@@ -1901,18 +1943,23 @@ class GraphicalUserInterfaceTX:
 				gui.TapRootContainer.tweaked_privkey=priv
 				tx=tapTree.SpendTransactionViaKeyPath(gui.TapRootContainer,self.get_destinationList())
 				console.printText(text="Signed Raw Transaction:\n"+str(tx))
+				self.broadcastWindow(tx)
 			else:
 				priv=self.cMultiSig.getInternalPrivateKey()
-				tx=tapTree.SpendTransactionViaScriptPath(gui.TapRootContainer.utxoList,self.typedAddress.get(),
-							(float)(self.typedAmount.get()),priv,gui.TapRootContainer.taptree,
+				tx=tapTree.SpendTransactionViaScriptPath(gui.TapRootContainer,self.get_destinationList(),priv,
 							self.tx_scriptContainer.script,self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock)
 				console.printText(text="Signed Raw Transaction:\n"+str(tx))
+				self.broadcastWindow(tx)
 			return
 
 		
 
 	def multisig_page2(self):
 		for i in range(0,len(self.entry_NonceHash)):
+			try:int(self.entry_NonceHash[i].get(),16)
+			except:
+				console.printText("Enter all your partners nonce hashes before proceeding")
+				return
 			input_=self.entry_NonceHash[i].get()
 			if(self.cMultiSig.getNonce(self.cMultiSig.keys[i][1]) is None):
 				self.cMultiSig.addNonceHash(i,bytes.fromhex(input_))
@@ -1921,7 +1968,7 @@ class GraphicalUserInterfaceTX:
 
 		self.page2=tk.LabelFrame(self.windowMultiSig)
 		self.page2.pack()
-		self.page2.place(height=200,width=550, x=10, y=50)
+		self.page2.place(height=800,width=700, x=10, y=50)
 
 		label_nonce=Label(self.page2,text ="Share nonce public key with partner")
 		label_nonce.pack()
@@ -1951,7 +1998,7 @@ class GraphicalUserInterfaceTX:
 
 		button_next=tk.Button(self.page2,text="Next", command=self.button3)
 		button_next.pack()
-		button_next.place(x=500,y=170)
+		button_next.place(x=600,y=30)
 
 	def button3(self):
 		self.multisig_page3(1)
@@ -1960,6 +2007,12 @@ class GraphicalUserInterfaceTX:
 
 
 	def multisig_page3(self,value):
+		for i in range(0,len(self.entry_NoncePub)):
+			try:int(self.entry_NoncePub[i].get(),16)
+			except:
+				console.printText("Enter all your partners nonce pubkeys before proceeding")
+				return
+
 		if(value==1):self.page2.place_forget()
 		else:self.page3.destroy()
 		
@@ -1983,17 +2036,14 @@ class GraphicalUserInterfaceTX:
 
 		self.page3=tk.LabelFrame(self.windowMultiSig)
 		self.page3.pack()
-		self.page3.place(height=400,width=700, x=10, y=50)
+		self.page3.place(height=800,width=700, x=10, y=50)
 
 		label_nonce=Label(self.page3,text ="Share partial signature with your partners")
 		label_nonce.pack()
 		label_nonce.place(height=20, x=200, y=5)
 
 		self.cMultiSig.genAggregateNonce()
-		print("1 INTERNAL KEYYYYY "+str(gui.TapRootContainer.internalKey.pubKey)+" Y: "+str(gui.TapRootContainer.internalKey.pubKey.get_y()))
-		
 		self.cMultiSig.genAggregatePubkey()
-		print("2 INTERNAL KEYYYYY "+str(gui.TapRootContainer.internalKey.pubKey)+" Y: "+str(gui.TapRootContainer.internalKey.pubKey.get_y()))
 		
 		self.cMultiSig.print()
 		if(self.keyPathChosen):self.spending_tx,input_tx=tapTree.createUnsignedTX(gui.TapRootContainer,self.get_destinationList())
@@ -2014,7 +2064,6 @@ class GraphicalUserInterfaceTX:
 		for i in range(0,len(self.cMultiSig.keys)+1):
 			if(i==len(self.cMultiSig.keys)):
 				if(self.keyPathChosen):
-					print("TTTWeak")
 					signature_list,self.sighash_list=tapTree.signMultiSig(gui.TapRootContainer,self.spending_tx,input_tx,self.cMultiSig,-1)
 					print("SpendingTX :_____")
 					print(signature_list)
@@ -2041,10 +2090,10 @@ class GraphicalUserInterfaceTX:
 				if(label is None):
 					print("ERROR IN multisig_page3. LABEL IS NONE")
 				label.pack()
-				label.place(height=20, x=10, y=30+i*90)
+				label.place(height=20, x=10, y=30+i*60)
 				
 				entry_Label=tk.Text(self.page3);entry_Label.pack()
-				entry_Label.place(height=70,width=500, x=100, y=30+i*90);entry_Label.delete(1.0, 'end');
+				entry_Label.place(height=50,width=500, x=100, y=30+i*60);entry_Label.delete(1.0, 'end');
 
 				if(signature_list is not None):
 					string_=""
@@ -2070,15 +2119,19 @@ class GraphicalUserInterfaceTX:
 		else:
 			button_next=tk.Button(self.page3,text="Combine Signatures", command=self.combineSignatures)
 			button_next.pack()
-			button_next.place(x=500,y=170)
+			button_next.place(x=100,y=30+len(self.cMultiSig.keys)*60)
 
 	def combineSignatures(self):
 	
 			for i in  range(0,len(self.cMultiSig.keys)):
 				if(self.cMultiSig.keys[i][0]is None):
 					sig=self.signature_entry[i].get("1.0",'end-1c')
-					print("[Implement] Check if it is a hex number")
-					#sig=int(sig.replace("\n",""))
+					try:
+						int(sig,16)
+					except:
+						console.printText("Enter all your partners signatures before proceeding")
+						return
+
 					sig=sig.splitlines()
 					for i in range(0,len(sig)):
 						sig[i]=int(sig[i])
@@ -2118,7 +2171,7 @@ class GraphicalUserInterfaceTX:
 
 			label=Label(self.page3,text ="Final TX")
 			label.pack()
-			label.place(height=20, x=10, y=30+num*90)
+			label.place(height=20, x=10, y=70+num*60)
 
 			print(rawtxs[0])
 			
@@ -2129,10 +2182,14 @@ class GraphicalUserInterfaceTX:
 			#entry_Label.insert(0,str(rawtxs[0])[siglabel1]+"\n"+str(rawtxs[0])[siglabel2])
 
 			entry_Label=tk.Text(self.page3);entry_Label.pack()
-			entry_Label.place(height=80,width=500, x=100, y=30+num*90);entry_Label.delete(1.0, 'end');
+			entry_Label.place(height=80,width=500, x=100, y=70+num*60);entry_Label.delete(1.0, 'end');
 			entry_Label.insert(1.0,str(rawtxs[0]))
 
-			console.printText(text="Copy this txid and publish it via other wallet\n"+str(rawtxs[0]))
+			console.printText(text="Signed Raw Transaction\n"+str(rawtxs[0]))
+
+			button_sendTX=tk.Button(self.page3,text="Send Transaction", command=lambda: self.broadcastTX(rawtxs[0]),bg="#00cc44",fg="#000000")
+			button_sendTX.pack()
+			button_sendTX.place(x=300,y=30+num*60)
 
 """
 class TapRootWallet:
@@ -2287,5 +2344,5 @@ label_Info.place(height=80, x=20, y=200)
 
 startThread(initService)#calls function in background, this establishes communication with blockchain providers
 
-root.mainloop()#Start main thread
 
+root.mainloop()#Start main thread
