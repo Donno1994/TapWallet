@@ -9,4 +9,5 @@ With this wallet you can create timelock scripts which I have not heavily tested
 There are still several bugs. 
 If you want to help, you can test this wallet (on testnet) and tell me your experience.
 
+To use this wallet, download this repository, enter TapWallet directory and run "python tapwallet.py"
 For further information read my medium article https://medium.com/@BR_Robin/basic-taproot-wallet-with-script-path-spend-c41f3f648a5a
