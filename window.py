@@ -208,7 +208,9 @@ class gui_key_tab:
 		#When the user is typing a seed, this function will check if it valid after each input
 
 		seed_words=self.entry_seed.get()
-		if(len(seed_words)==0):return
+		if(len(seed_words)==0):
+			self.text_seed_error.configure(text="")
+			return
 
 		try:
 			root_key=bitcoinlib.keys.HDKey().from_passphrase(seed_words)
