@@ -1587,8 +1587,12 @@ class gui_transaction_tab:
 
 		if(self.keyPathChosen):
 			if(len(self.PathValueArray)==1):#KeyPath Single Key
-
-				tx=taproot.SpendTransactionViaKeyPath(global_.gl_gui_build_address.taproot_container,self.get_destinationList())
+				privkey_list=[]
+				for utxo in global_.gl_gui_build_address.taproot_container.utxoList:
+					if(utxo[0].get()==1):
+						address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
+						privkey_list.append(global_.gl_gui_build_address.taproot_container.tweaked_privkey[address_index])
+				tx=taproot.SpendTransactionViaKeyPath(global_.gl_gui_build_address.taproot_container,privkey_list,self.get_destinationList())
 				global_.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
 				self.broadcastWindow(tx)
 
@@ -1610,6 +1614,7 @@ class gui_transaction_tab:
 			for utxo in global_.gl_gui_build_address.taproot_container.utxoList:
 				if(utxo[0].get()==1):
 					address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
+					if(len(pubContainer.privkey)==1):address_index=0
 					privkey_list.append(pubContainer.privkey[address_index])
 					script_list.append(self.tx_scriptContainer.script[address_index])
 			tx=taproot.SpendTransactionViaScriptPath(global_.gl_gui_build_address.taproot_container,self.get_destinationList(),privkey_list,
@@ -1774,8 +1779,8 @@ class gui_transaction_tab:
 			if(self.keyPathChosen):
 				for a in range(0,tx_inputs):
 					priv_list.append(self.cMultiSig[a].getTweakedPrivateKey())
-				global_.gl_gui_build_address.taproot_container.tweaked_privkey=priv_list
-				tx=taproot.SpendTransactionViaKeyPath(global_.gl_gui_build_address.taproot_container,self.get_destinationList(),address_index_from_short_list=True)
+				#global_.gl_gui_build_address.taproot_container.tweaked_privkey=priv_list
+				tx=taproot.SpendTransactionViaKeyPath(global_.gl_gui_build_address.taproot_container,priv_list,self.get_destinationList(),address_index_from_short_list=True)
 				global_.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
 				self.broadcastWindow(tx)
 			else:
