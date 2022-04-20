@@ -1,8 +1,5 @@
 ![Taproot Twitter](https://user-images.githubusercontent.com/30496048/156334114-51db784d-f341-4280-8b33-e2454e1aa1b9.png)
 
-## Don't use on mainnet.
-I found a bug which leaks your private key if you use multiple transaction inputs when doing Multisig (nonce reuse).
-This will be fixed in the next update.
 
 # TapWallet
 A taproot dedicated wallet. It can spend via keypath and scriptpath.
