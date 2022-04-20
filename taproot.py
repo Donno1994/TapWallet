@@ -183,17 +183,18 @@ def signTX(taprootObject,privkey_list,spending_tx,input_tx,script_list=None,addr
     return rawtxs[0]
 
 
-def SpendTransactionViaKeyPath(taprootObject,destination_list,change_amount=0,address_index_from_short_list=False):
+def SpendTransactionViaKeyPath(taprootObject,privkey_list,destination_list,change_amount=0,address_index_from_short_list=False):
 
     spending_tx,input_tx=createUnsignedTX(taprootObject,destination_list)
-    signedTX=signTX(taprootObject,taprootObject.tweaked_privkey,spending_tx,input_tx,None,address_index_from_short_list)
+#signedTX=signTX(taprootObject,taprootObject.tweaked_privkey,spending_tx,input_tx,None,address_index_from_short_list)
+    signedTX=sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx)
 
     return signedTX
 
-def SpendTransactionViaScriptPath(taprootObject,destination_list,privkey,script,timelockDelay,timeLock,address_index_from_short_list=False):
+def SpendTransactionViaScriptPath(taprootObject,destination_list,privkey_list,script,timelockDelay,timeLock,address_index_from_short_list=False):
         
     spending_tx,input_tx=createUnsignedTX(taprootObject,destination_list,timelockDelay,timeLock)
-    signedTX=sign_output_with_all_keys(taprootObject,privkey,spending_tx,input_tx,script)
+    signedTX=sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,script)
 
     return signedTX
 
