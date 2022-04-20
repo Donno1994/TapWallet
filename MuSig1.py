@@ -16,7 +16,6 @@ class c_MultiSig:
         self.nonce_agg=None
         self.tweak=None
         if(tweak is not None):
-            print(type(tweak))
             t=ECKey().set(tweak)
             tweakNonce=ECKey().set(111)
             self.tweak=[t,t.get_pubkey(),tweakNonce,tweakNonce.get_pubkey(),sha256(tweakNonce.get_pubkey().get_bytes())]
@@ -24,6 +23,7 @@ class c_MultiSig:
     
     def addPrivKey(self,privKey,nonce=None):
         nonce=generate_schnorr_nonce()
+        #nonce=ECKey().set(111)
         nonce_hash=sha256(nonce.get_pubkey().get_bytes())
         self.keys.append([privKey,privKey.get_pubkey(),nonce,nonce.get_pubkey(),nonce_hash])
 
@@ -33,16 +33,20 @@ class c_MultiSig:
         self.keys.append([None,pubKey,None,None,None])
        
     def print(self):
+        print("Print MultiSig")
         for i in range(0,len(self.keys)):
             if(self.keys[i][0]):
-                print("Yours: "+str(self.keys[i][0])+" : "+str(self.keys[i][1])+" Y: "+str(self.keys[i][1].get_y()))
+                #print("Yours: "+str(self.keys[i][0])+" : "+str(self.keys[i][1])+" Y: "+str(self.keys[i][1].get_y()))
+                print("Yours: "+str(self.keys[i][1])+" Y: "+str(self.keys[i][1].get_y()))
                 #print("Nonce: "+str(self.keys[i][2])+" : "+str(self.keys[i][3])+" Y: "+str(self.keys[i][3].get_y()))
+                print("Nonce: "+str(self.keys[i][3])+" Hash: "+str(self.keys[i][4].hex()))
                 #print("Nonce Hash:"+str(self.keys[i][4].hex()))
             else:
                 
                 print("Not yours: "+str(self.keys[i][1])+" Y: "+str(self.keys[i][1].get_y()))
                 if(self.keys[i][3] is not None):
                     print("Nonce Pub: "+str(self.keys[i][3]))
+                if(self.keys[i][4] is not None):
                     print("Nonce Hash: "+str(self.keys[i][4].hex()))
         if(self.nonce_agg is not None):
             print("Agg Nonce: "+str(self.nonce_agg)+"  Y: "+str(self.nonce_agg.get_y()))
@@ -56,7 +60,6 @@ class c_MultiSig:
     def addNonceHash(self,index,nonce_hash):
         
         self.keys[index][4]=nonce_hash
-        #print(self.keys[index][4])
 
     def addNoncePub(self,index,nonce):
         nonce_pub=ECPubKey().set(nonce)
@@ -106,46 +109,52 @@ class c_MultiSig:
                 self.tweak[1].negate()
                 self.publicKey.negate()
 
-                
-
-    def genAggregateNonce(self):
-
+    
         
+    def genAggregateNonce(self):
         pubkeys=[]
-        if(self.tweak is not None):pubkeys.append(self.tweak[3])
 
         for i in range(0,len(self.keys)):
             pubkeys.append(self.keys[i][3])
         self.nonce_agg, negated =aggregate_schnorr_nonces(pubkeys)
+        
+        if(self.tweak is not None):
+            self.gen_tweak_nonce(self.nonce_agg)
+            pubkeys.append(self.tweak[3])
+            self.nonce_agg, negated =aggregate_schnorr_nonces(pubkeys)
 
         if negated:
             for key in self.keys:
                 if(key[2]is not None):
                     key[2].negate()
-                key[3]=key[3].negate()
+                key[3].negate()
 
             if(self.tweak is not None):self.tweak[2].negate();self.tweak[3].negate()
                 
 
-            #self.nonce_agg.negate()
-        
+    def gen_tweak_nonce(self,agg):
+        #Everyone who sign needs to generate a random nonce.
+        #The tweak however is not owned by a single person, but is known to everybody.
+        #This method creates a deterministic tweak nonce which is derived from all the other nonces
+
+        hash_=sha256(agg.get_bytes())
+        tweakNonce=ECKey().set(hash_)
+        self.tweak[2]=tweakNonce
+        self.tweak[3]=tweakNonce.get_pubkey()
+        self.tweak[4]=sha256(tweakNonce.get_pubkey().get_bytes())
+
     def init_tx():
         
         self.nonces=[]
         for i in range(0,len(self.keys)):
-            print(self.keys)
             self.nonces=generate_schnorr_nonce()
 
     def verify(self,Sig,Msg):
-        print("Verify Message "+str(Msg.hex()))
-        print("Signature "+str(Sig.hex()))
-        print("Key X: "+str(self.publicKey)+" Y: "+str(self.publicKey))
         return self.publicKey.verify_schnorr(Sig, Msg)
 
     def getTweakedPublicKey(self):
         if(self.tweak is None):
             return self.publicKey
-        print(type(self.tweak[1]))
         tweakedPub=self.publicKey+self.tweak[1]
         return tweakedPub
 
@@ -158,7 +167,6 @@ class c_MultiSig:
         priv_agg=None
         for i in range(0,len(self.keys)):
             if(self.keys[i][0] is None):return None
-            print(self.keys[i][0])
             if(priv_agg is None):priv_agg=self.keys[i][0]
             else: priv_agg=priv_agg+self.keys[i][0]
         
@@ -174,7 +182,6 @@ class c_MultiSig:
         priv_agg=self.tweak[0]
         for i in range(0,len(self.keys)):
             if(self.keys[i][0] is None):return None
-            print(self.keys[i][0])
             if(priv_agg is None):priv_agg=self.keys[i][0]
             else: priv_agg=priv_agg+self.keys[i][0]
 
