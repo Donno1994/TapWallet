@@ -984,15 +984,6 @@ class gui_transaction_tab:
 		self.pubkey=pubKey
 		self.timelockDelay=timelockDelay
 
-		
-
-		self.segwitaddressDisplay =tk.StringVar()
-		self.segwitaddressDisplay.set("Address: Please create a taproot address first")
-		displayAddress=tk.Entry(self.root,textvariable=self.segwitaddressDisplay,fg="black",bg="white",bd=0,state="readonly")
-		displayAddress.pack()
-		displayAddress.place(width=450,anchor="nw")
-
-
 		self.containerChooseUTXO = tk.LabelFrame(self.root)
 		self.containerChooseUTXO.pack()
 		self.containerChooseUTXO.place(height=155,width=600, x=5,y=30)
@@ -1146,7 +1137,6 @@ class gui_transaction_tab:
 		
 	def update(self,utxo_List):
 		if(global_.gl_gui_build_address.taproot_container):
-			self.segwitaddressDisplay.set("Address: "+str(global_.gl_gui_build_address.taproot_container.TapRootAddress[0]))
 			i=0
 			balance=0
 			self.label_selected.config(text="Selected Coins: 0 BTC")
@@ -1181,8 +1171,6 @@ class gui_transaction_tab:
 			self.label_balance.config(text="Balance: "+"{:,.8f}".format(balance)+" BTC")
 			self.updateSelected()
 
-		else:
-			self.segwitaddressDisplay.set("Address: Please create a taproot address first")
 		
 	def updateSelected(self):
 		self.selected_balance=0
