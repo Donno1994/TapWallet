@@ -603,6 +603,7 @@ class gui_address_tab:
 		self.delay=delay
 		blockchain.startThread(global_.gl_gui_address_tab.init_window_after_taproot_generated_thread)
 
+
 	def init_window_after_taproot_generated_thread(self):
 		
 		balance_list,utxo_list=blockchain.get_utxos_from_address_list()
@@ -725,8 +726,9 @@ class gui_build_address_canvas:
 
 
 		self.taproot_container=container.c_Container_Taproot(x,y,root_key,merkle)
-		
 		global_.gl_gui_address_tab.init_window_after_taproot_generated()
+		global_.gl_gui_transaction_tab.entry_change_address.insert(0,global_.gl_gui_build_address.taproot_container.TapRootAddress[0])
+		
 		#thread_balance()
 		#guiTX.selectSigningMethod()
 
@@ -983,6 +985,7 @@ class gui_transaction_tab:
 		self.privkey=privKey
 		self.pubkey=pubKey
 		self.timelockDelay=timelockDelay
+		self.active_canvas=None
 
 		self.containerChooseUTXO = tk.LabelFrame(self.root)
 		self.containerChooseUTXO.pack()
@@ -1004,84 +1007,109 @@ class gui_transaction_tab:
 		self.label_selected.place(x=350,y=10)
 
 		#ScrollFrame
-		container = tk.Frame(self.containerChooseUTXO)
+		container = tk.Frame(self.containerChooseUTXO,borderwidth=4)
 		container.pack()
 		container.place(height=100,width=595,x=0,y=50)
-		canvas = tk.Canvas(container)#,bg="#00FF00")
-		canvas.place(height=100,width=100, x=0,y=50)
-		scrollbar = tk.Scrollbar(container, orient="vertical", command=canvas.yview)
-		self.scrollable_frame = tk.Frame(canvas,width=100,height=150)
-		self.scrollable_frame.place(x=0,y=50)
+		self.canvas_utxo = tk.Canvas(container)#,bg="#00FF00")
+		self.canvas_utxo.place(height=0,width=0, x=0,y=0)
+		scrollbar = tk.Scrollbar(container, orient="vertical", command=self.canvas_utxo.yview)
+		self.scrollable_frame_utxo = tk.Frame(self.canvas_utxo,width=595,height=100)
+		self.scrollable_frame_utxo.place(x=0,y=50)
 		
 		
-		self.scrollable_frame.bind("<Configure>",lambda e: canvas.configure(	scrollregion=canvas.bbox("all")))
-
+		self.scrollable_frame_utxo.bind("<Configure>",lambda e: self.canvas_utxo.configure(	scrollregion=self.canvas_utxo.bbox("all")))
+		self.scrollable_frame_utxo.bind('<Enter>', self._bind_canvas_utxo_to_mousewheel)
+		self.scrollable_frame_utxo.bind('<Leave>', self._unbound_to_mousewheel)
 			
 
-		canvas.create_window(0, 0, window=self.scrollable_frame, anchor="w")
-		canvas.configure(yscrollcommand=scrollbar.set)
+		self.canvas_utxo.create_window(0, 0, window=self.scrollable_frame_utxo, anchor="w")
+		self.canvas_utxo.configure(yscrollcommand=scrollbar.set)
 
 
 		
 
 		
-		canvas.pack(side="left", fill="both", expand=True)
+		self.canvas_utxo.pack(side="left", fill="both", expand=True)
 		scrollbar.pack(side="right", fill="y")
 
 		##########################
 
 		self.containerCreateTX = tk.LabelFrame(self.root)
 		self.containerCreateTX.pack()
-		self.containerCreateTX.place(height=155,width=600, x=5,y=185)
+		self.containerCreateTX.place(height=185,width=600, x=5,y=185)
 
 		self.typedLabel =tk.StringVar()#Entropy Textfield
 
-		self.typedAddress=tk.StringVar()#Address we want to send funds to
-		self.typedAddress.set("")
-		self.typedAmount =tk.StringVar()#Private Key Textfield
-		self.typedAmount.set("")
 		self.typedFee =tk.StringVar()#Public Key Textfield
 		self.typedChange =tk.StringVar()#Public Key Textfield
 
+		#ScrollFrame
+		container2 = tk.Frame(self.containerCreateTX,borderwidth=4)
+		container2.pack()
+		container2.place(height=180,width=595,x=0,y=0)
+		self.canvas_tx = tk.Canvas(container2)#,bg="#00FF00")
+		self.canvas_tx.place(height=0,width=0, x=0,y=0)
+		scrollbar2 = tk.Scrollbar(container2, orient="vertical", command=self.canvas_tx.yview)
+		self.scrollable_frame_tx = tk.Frame(self.canvas_tx,width=595,height=160)
+		self.scrollable_frame_tx.place(x=0,y=0)
+		
+		
+		self.scrollable_frame_tx.bind("<Configure>",lambda e: self.canvas_tx.configure(	scrollregion=self.canvas_tx.bbox("all")))
+		self.scrollable_frame_tx.bind('<Enter>', self._bind_canvas_tx_to_mousewheel)
+		self.scrollable_frame_tx.bind('<Leave>', self._unbound_to_mousewheel)
+			
+
+		self.canvas_tx.create_window(0, 0, window=self.scrollable_frame_tx, anchor="w")
+		self.canvas_tx.configure(yscrollcommand=scrollbar2.set)
+
+
+		
+
+		
+		self.canvas_tx.pack(side="left", fill="both", expand=True)
+		scrollbar2.pack(side="right", fill="y")
 
 		##Static Key Information
 		#self.label_label=tk.Label(self.containerCreateTX,text="Label:");         self.label_label.pack();   self.label_label.place(height=20,x=4,y=2)
-		self.label_1=tk.Label(self.containerCreateTX,text="Bitcoin address  					Amount");     self.label_1.pack(); self.label_1.place(height=20,x=187,y=2)
-		self.label_address=tk.Label(self.containerCreateTX,text="Send To:");     self.label_address.pack(); self.label_address.place(height=20,x=4,y=27)
-		self.label_fee=tk.Label(self.containerCreateTX,text="Fee:");		     self.label_fee.pack();     self.label_fee.place(height=20,x=4,y=52)
-		self.label_change=tk.Label(self.containerCreateTX,text="Change:");       self.label_change.pack();  self.label_change.place(height=20,x=4,y=77)
+		self.label_1=tk.Label(self.scrollable_frame_tx,text="Bitcoin address  					Amount");     self.label_1.pack(); self.label_1.place(height=20,x=187,y=2)
 		
 		
-		##Editable Key Information
+		self.button_add_address=tk.Button(self.scrollable_frame_tx,text="Add address",bg="#00469b",fg="#FFFFFF",command=self.add_address_field); self.button_add_address.pack(); self.button_add_address.place(height=20, x=4, y=77)
+		self.label_fee=tk.Label(self.scrollable_frame_tx,text="Fee:");		     self.label_fee.pack();     self.label_fee.place(height=20,x=400,y=77)
+		self.label_change=tk.Label(self.scrollable_frame_tx,text="Change:");       self.label_change.pack();  self.label_change.place(height=20,x=4,y=52)
+		
+		self.label_address=[]
+		self.label_address.append(tk.Label(self.scrollable_frame_tx,text="Send To:"));
+		self.label_address[0].pack();self.label_address[0].place(height=20,x=4,y=27)
 
-		#self.entry_Label=tk.Entry(self.containerCreateTX,textvariable=self.typedLabel);self.entry_Label.pack()
-		#self.entry_Label.place(height=20,width=300, x=100, y=2);
+		self.entry_address=[]
+		self.entry_address.append(tk.Entry(self.scrollable_frame_tx,width=20,bg="#CCCCEE"))
+		self.entry_address[0].pack();self.entry_address[0].place(height=20,width=380, x=70, y=27)
+		self.entry_address[0].bind("<KeyRelease>", self.checkTxReady);
+		
+		self.entry_amount=[]
+		self.entry_amount.append(tk.Entry(self.scrollable_frame_tx,bg="#EECCCC"))
+		self.entry_amount[0].pack();self.entry_amount[0].place(height=20,width=75, x=460, y=27)
+		self.entry_amount[0].bind("<KeyRelease>", self.updateFee);
 
+		self.button_kill_address=[]
 		
-		
-		self.entry_Address = tk.Entry(self.containerCreateTX,textvariable=self.typedAddress,width=20,bg="#CCCCEE")
-		self.entry_Address.pack();self.entry_Address.place(height=20,width=380, x=70, y=27)
-		self.entry_Address.bind("<KeyRelease>", self.checkTxReady);
-		
-		self.entry_Amount=tk.Entry(self.containerCreateTX,textvariable=self.typedAmount,bg="#EECCCC")
-		self.entry_Amount.pack();self.entry_Amount.place(height=20,width=100, x=460, y=27)
-		self.entry_Amount.bind("<KeyRelease>", self.updateFee);
-		#self.entry_Amount.bind("<KeyRelease>", self.checkTxReady);
-		
-		self.entry_Fee=tk.Entry(self.containerCreateTX,textvariable=self.typedFee)
-		self.entry_Fee.pack();self.entry_Fee.place(height=20,width=100, x=70, y=52)
-		self.entry_Fee.bind("<KeyRelease>", self.updateChange);
+		self.entry_fee=tk.Entry(self.scrollable_frame_tx,textvariable=self.typedFee)
+		self.entry_fee.pack();self.entry_fee.place(height=20,width=75, x=460, y=77)
+		self.entry_fee.bind("<KeyRelease>", self.updateChange);
 
-		self.entry_Change=tk.Entry(self.containerCreateTX,textvariable=self.typedChange,state=tk.DISABLED)
-		self.entry_Change.pack();self.entry_Change.place(height=20,width=100, x=70, y=77)
-		
+		self.entry_change_address=tk.Entry(self.scrollable_frame_tx,width=20,bg="#CCCCEE")
+		self.entry_change_address.pack();self.entry_change_address.place(height=20,width=380, x=70, y=52)
+		#self.entry_change_address.bind("<KeyRelease>", self.checkTxReady);
+
+		self.entry_change_amt=tk.Entry(self.scrollable_frame_tx,textvariable=self.typedChange,state=tk.DISABLED)
+		self.entry_change_amt.pack();self.entry_change_amt.place(height=20,width=75, x=460, y=52)
 		
 
 
-
-		self.button=tk.Button(self.containerCreateTX,text="Create Transaction",bg="#00469b",fg="#FFFFFF",command=self.createTX, state=tk.DISABLED)
-		self.button.pack()
-		self.button.place(height=20, x=400, y=77)
+		self.button_tx_ready=tk.Button(self.scrollable_frame_tx,text="Create Transaction",bg="#00469b",fg="#FFFFFF",command=self.createTX, state=tk.DISABLED)
+		self.button_tx_ready.pack()
+		self.button_tx_ready.place(height=20, x=200, y=77)
 
 		self.PathContainer=None
 		self.PathValueArray=[]
@@ -1090,36 +1118,116 @@ class gui_transaction_tab:
 
 		self.selected_balance=0
 
+	def add_address_field(self,event=None):
+		num_addresses=len(self.entry_address)
+
+		self.label_address.append(tk.Label(self.scrollable_frame_tx,text="Send To:"));     self.label_address[-1].pack(); self.label_address[-1].place(height=20,x=4,y=27+num_addresses*25)
+		self.entry_address.append(tk.Entry(self.scrollable_frame_tx,width=20,bg="#CCCCEE"))
+		self.entry_address[-1].pack();self.entry_address[-1].place(height=20,width=380, x=70, y=27+num_addresses*25)
+		self.entry_address[-1].bind("<KeyRelease>", self.checkTxReady);
+
+		self.entry_amount.append(tk.Entry(self.scrollable_frame_tx,bg="#EECCCC"))
+		self.entry_amount[-1].pack();self.entry_amount[-1].place(height=20,width=75, x=460, y=27+num_addresses*25)
+		self.entry_amount[-1].bind("<KeyRelease>", self.updateFee);
+
+		self.button_kill_address.append(tk.Button(self.scrollable_frame_tx,text="X",bg="#FECCCC",command=lambda:self.kill_address_field(index=num_addresses)))
+		self.button_kill_address[-1].pack();self.button_kill_address[-1].place( x=540, y=27+num_addresses*25,height=20,width=20)
+		#self.button_kill_address[-1].bind('<Button-3>',lambda: x=self.print_address_field(index=num_addresses))
+		self.button_add_address.place(y=77+num_addresses*25)
+		self.label_fee.place(y=77+num_addresses*25)
+		self.entry_fee.place(y=77+num_addresses*25)
+		self.label_change.place(y=52+num_addresses*25)
+		self.entry_change_address.place(y=52+num_addresses*25)
+		self.entry_change_amt.place(y=52+num_addresses*25)
+		self.button_tx_ready.place(y=77+num_addresses*25)
+		self.scrollable_frame_tx.configure(height=num_addresses*25+140)
+		print("ADD: Num Addresses "+str((num_addresses)))
+		self.canvas_tx.yview_moveto( 1 )
+
+	def kill_address_field(self,event=None,index=0):
+		print("KILL: Index "+str(index))
+		print("KILL: len(entry) "+str(len(self.entry_address)))
+		self.label_address.pop(index).destroy()
+		self.entry_address.pop(index).destroy()
+		self.entry_amount.pop(index).destroy()
+		self.button_kill_address.pop(index-1).destroy()
+
+		x=0
+		for button in self.button_kill_address:
+			button.place(x=540, y=52+x*25)
+			button.configure(command=lambda:self.kill_address_field(index=x))
+			self.label_address[x+1].place(height=20,x=4,y=52+x*25)
+			self.entry_address[x+1].place(height=20,width=380, x=70, y=52+x*25)
+			self.entry_amount[x+1].place(height=20,width=75, x=460, y=52+x*25)
+
+			x=x+1
+
+		num_addresses=len(self.entry_address)
+		print("KILL: len(entry) "+str(len(self.entry_address)))
+		self.button_add_address.place(y=52+num_addresses*25)
+		self.label_fee.place(y=52+num_addresses*25)
+		self.entry_fee.place(y=52+num_addresses*25)
+		self.label_change.place(y=27+num_addresses*25)
+		self.entry_change_address.place(y=27+num_addresses*25)
+		self.entry_change_amt.place(y=27+num_addresses*25)
+		self.button_tx_ready.place(y=52+num_addresses*25)
+		self.scrollable_frame_tx.configure(height=num_addresses*25+140)
+
+		self.updateFee()
+
+	def _bind_canvas_tx_to_mousewheel(self, event):
+		self.canvas_tx.bind_all("<MouseWheel>", self._canvas_tx_mousewheel)
+		self.active_canvas=self.canvas_tx
+
+	def _bind_canvas_utxo_to_mousewheel(self, event):
+		print("Bind")
+		self.canvas_utxo.bind_all("<MouseWheel>", self._canvas_tx_mousewheel)
+		self.active_canvas=self.canvas_utxo
+
+	def _unbound_to_mousewheel(self, event):
+		self.canvas_tx.unbind_all("<MouseWheel>")
+		self.canvas_utxo.unbind_all("<MouseWheel>")
+
+	def _canvas_tx_mousewheel(self, event):
+		self.active_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+	def print_address_field(self,event=None,index=0):
+		print(index)
+
 	def checkTxReady(self,event=None):
 		if(event is not None):
 			if (event.keycode==17 or event.keycode==16):return#Don't trigger when Shift or Control is released
 		ret=False
-		if(global_.gl_gui_build_address.taproot_container is None):self.button["state"]=tk.DISABLED;ret=True
-		if(self.selected_balance<=0):self.button["state"]=tk.DISABLED;ret=True
-		if(taproot.address_to_scriptPubKey(self.typedAddress.get()) is None):
-			self.button["state"]=tk.DISABLED;
-			ret=True
-			self.entry_Address.configure(fg="#ff0000")
-		else:
-			self.entry_Address.configure(fg="#000000")
+		if(global_.gl_gui_build_address.taproot_container is None):self.button_tx_ready["state"]=tk.DISABLED;ret=True
+		if(self.selected_balance<=0):self.button_tx_ready["state"]=tk.DISABLED;ret=True
+
+		for i in range(len(self.entry_address)):
+
+			if(taproot.address_to_scriptPubKey(self.entry_address[i].get()) is None):
+				self.button_tx_ready["state"]=tk.DISABLED;
+				ret=True
+				self.entry_address[i].configure(fg="#ff0000")
+			else:
+				self.entry_address[i].configure(fg="#000000")
 		
-		if(len(self.typedAmount.get()) ==0):self.button["state"]=tk.DISABLED;ret=True
 		
-		try:
-			amt=(float)(self.typedAmount.get())
-		except:
-			self.entry_Amount.configure(fg="#ff0000")
-			self.button["state"]=tk.DISABLED;return
-		else:self.entry_Amount.configure(fg="#000000")
+		for i in range(len(self.entry_amount)):
+			print(self.entry_amount[i].get())
+			try:
+				amt=(float)(self.entry_amount[i].get())
+			except:
+				self.entry_amount[i].configure(fg="#ff0000")
+				self.button_tx_ready["state"]=tk.DISABLED;return
+			else:self.entry_amount[i].configure(fg="#000000")
 
 		try:
 			fee=(float)(self.typedFee.get())
 		except:
-			self.entry_Fee.configure(fg="#ff0000")
-			self.button["state"]=tk.DISABLED;return
-		else:self.entry_Fee.configure(fg="#000000")
+			self.entry_fee.configure(fg="#ff0000")
+			self.button_tx_ready["state"]=tk.DISABLED;return
+		else:self.entry_fee.configure(fg="#000000")
 		
-		if(self.selected_balance-amt<=0):self.button["state"]=tk.DISABLED;return
+		if(self.selected_balance-amt<=0):self.button_tx_ready["state"]=tk.DISABLED;return
 
 		if(ret):return
 
@@ -1131,16 +1239,17 @@ class gui_transaction_tab:
 			for i in range(0,len(self.PathValueArray2)):
 				if(self.PathValueArray2[i][0].get()):checked=True
 		
-		if(checked==False):self.button["state"]=tk.DISABLED;return
+		if(checked==False):self.button_tx_ready["state"]=tk.DISABLED;return
 
-		self.button["state"]=tk.NORMAL
+		self.button_tx_ready["state"]=tk.NORMAL
 		
 	def update(self,utxo_List):
+
 		if(global_.gl_gui_build_address.taproot_container):
 			i=0
 			balance=0
 			self.label_selected.config(text="Selected Coins: 0 BTC")
-			for child in self.scrollable_frame.winfo_children():
+			for child in self.scrollable_frame_utxo.winfo_children():
 				child.destroy()
 			del global_.gl_gui_build_address.taproot_container.utxoList[:]
 
@@ -1156,19 +1265,14 @@ class gui_transaction_tab:
 				
 				global_.gl_gui_build_address.taproot_container.utxoList.append(new_utxo)
 				
-				#label_utxo=tk.Label(self.scrollable_frame,text=txId+" ["+str(outputIndex)+"]"+":"+"{:,.8f}".format(value)+" BTC");label_utxo.pack();#label_utxo.place(x=10,y=10+20*i)
-				#ttk.Label(self.scrollable_frame, text="Sample scrolling label").pack()
-				check_utxo=tk.Checkbutton(self.scrollable_frame, text=shortenHexString(address)+" : "+shortenHexString(txId)+" ["+str(outputIndex)+"]"+":"+"{:,.8f}".format(value)+" BTC", variable=var,command=self.updateSelected)
-				check_utxo.pack()#check_utxo.place(x=500,y=10+20*i)
+				check_utxo=tk.Checkbutton(self.scrollable_frame_utxo, text=shortenHexString(address)+" : "+shortenHexString(txId)+" ["+str(outputIndex)+"]"+":"+"{:,.8f}".format(value)+" BTC", variable=var,command=self.updateSelected)
+				check_utxo.pack()
 				check_utxo.bind('<Button-3>',make_lambda(str(txId)))
 
 				balance+=value
 				i=i+1
 
-			#for i in range(100):
-			#	label_utxo=tk.Label(self.scrollable_frame,text="hallo"+str(i))
-			#	label_utxo.pack()
-			self.label_balance.config(text="Balance: "+"{:,.8f}".format(balance)+" BTC")
+			self.label_balance.config(text="Total Balance: "+"{:,.8f}".format(balance)+" BTC")
 			self.updateSelected()
 
 		
@@ -1436,95 +1540,110 @@ class gui_transaction_tab:
 		#self.highlightContainer.place(height=15, x=105, y=2,width=85)
 		self.checkTxReady()
 
-	def updateFee(self,event):
-		self.entry_Fee.delete(0, 'end')
-		self.entry_Change.configure(state='normal')
-		self.entry_Change.delete(0, 'end')
-		try:
-			amt=(float)(self.typedAmount.get())
-		except:
-			self.entry_Amount.configure(fg="#ff0000")
-			self.button["state"]=tk.DISABLED;return False
-		else:self.entry_Amount.configure(fg="#000000")
+	def updateFee(self,event=None):
+		self.entry_fee.delete(0, 'end')
+		self.entry_change_amt.configure(state='normal')
+		self.entry_change_amt.delete(0, 'end')
 
-		if(amt==0):
-			self.button["state"]=tk.DISABLED;self.entry_Amount.configure(fg="#ff0000");return False
-		else:self.entry_Amount.configure(fg="#000000")
+		total_amt=0
+
+		for i in range(len(self.entry_amount)):
+			try:
+				amt=(float)(self.entry_amount[i].get())
+				print("amt_ "+str(amt))
+			except:
+				self.entry_amount[i].configure(fg="#ff0000")
+				self.button_tx_ready["state"]=tk.DISABLED;return False
+			else:self.entry_amount[i].configure(fg="#000000")
+
+			if(amt==0):
+				self.button_tx_ready["state"]=tk.DISABLED;self.entry_amount[i].configure(fg="#ff0000");return False
+			else:self.entry_amount[i].configure(fg="#000000")
+			total_amt=total_amt+amt
 		
-		fee=(round(self.selected_balance-amt, 8))
+			print("Round "+str(i))
+			print("amt: "+str(amt))
+			print("Total: "+str(total_amt))
+		fee=(round(self.selected_balance-total_amt, 8))
 		
-		if((float)(fee)<0):
-			self.entry_Amount.configure(fg="#ff0000")
-			self.button["state"]=tk.DISABLED;return False
+		if((float)(fee)<=0):
+			for entry_field in self.entry_amount:
+				entry_field.configure(fg="#ff0000")
+			self.button_tx_ready["state"]=tk.DISABLED;return False
 			return False
-		else:self.entry_Amount.configure(fg="#000000")
+		else:
+			for entry_field in self.entry_amount:
+				entry_field.configure(fg="#000000")
 
-		suggested_fee=0.00001
+		suggested_fee=0.000004
 		if((float)(fee)<=suggested_fee):
-			self.entry_Fee.insert(0,"{:,.8f}".format(fee))
-			self.entry_Change.insert(0,"0")
-			self.entry_Change.configure(state='disabled')
+			self.entry_fee.insert(0,"{:,.8f}".format(fee))
+			self.entry_change_amt.insert(0,"0")
+			self.entry_change_amt.configure(state='disabled')
 			self.checkTxReady()
 			return True
 		change=(round(fee-suggested_fee, 8))
-		self.entry_Fee.insert(0,"{:,.8f}".format(suggested_fee))
-		self.entry_Change.insert(0,"{:,.8f}".format(change))
-		self.entry_Change.configure(state='disabled')
+		self.entry_fee.insert(0,"{:,.8f}".format(suggested_fee))
+		self.entry_change_amt.insert(0,"{:,.8f}".format(change))
+		self.entry_change_amt.configure(state='disabled')
 
 		self.checkTxReady()
 		return True
 		
 
 	def updateChange(self,event):
-		self.entry_Change.configure(state='normal')
-		self.entry_Change.delete(0, 'end')
+		self.entry_change_amt.configure(state='normal')
+		self.entry_change_amt.delete(0, 'end')
 		try:
 			fee=(float)(self.typedFee.get())
 		except:
-			self.entry_Change.insert(0,"invalid input")
-			self.entry_Change.configure(state='disabled')
-			self.entry_Fee.configure(fg="#ff0000");self.button["state"]=tk.DISABLED;ret=True;
+			self.entry_change_amt.insert(0,"invalid input")
+			self.entry_change_amt.configure(state='disabled')
+			self.entry_fee.configure(fg="#ff0000");self.button_tx_ready["state"]=tk.DISABLED;ret=True;
 			return False
-		else:self.entry_Fee.configure(fg="#000000")
+		else:self.entry_fee.configure(fg="#000000")
 
-		try:
-			amt=(float)(self.typedAmount.get())
-		except:
-			self.entry_Fee.insert(0,"invalid input")
-			return False
+		for entry_field in self.entry_amount:
+			try:
+				amt=(float)(entry_field.get())
+			except:
+				self.entry_fee.insert(0,"invalid input")
+				return False
 
 		suggested_fee=0.000001
 		if((float)(fee)<suggested_fee):
-			self.entry_Change.insert(0,"Fee too small")
-			self.entry_Change.configure(state='disabled')
-			self.entry_Fee.configure(fg="#ff0000");self.button["state"]=tk.DISABLED;ret=True;
+			self.entry_change_amt.insert(0,"Fee too small")
+			self.entry_change_amt.configure(state='disabled')
+			self.entry_fee.configure(fg="#ff0000");self.button_tx_ready["state"]=tk.DISABLED;ret=True;
 			return False
-		else:self.entry_Fee.configure(fg="#000000")
+		else:self.entry_fee.configure(fg="#000000")
 
-		#if(self.typedAmount.get().isdecimal()==False):return
-		#amt=(float)(self.typedAmount.get())
 
 		change=(round(self.selected_balance-amt-fee, 8))
 
 		if(change<0):
-			self.entry_Change.insert(0,"not enough funds")
-			self.entry_Change.configure(state='disabled')
-			self.entry_Fee.configure(fg="#ff0000");self.button["state"]=tk.DISABLED;ret=True;
+			self.entry_change_amt.insert(0,"not enough funds")
+			self.entry_change_amt.configure(state='disabled')
+			self.entry_fee.configure(fg="#ff0000");self.button_tx_ready["state"]=tk.DISABLED;ret=True;
 			return False
-		else:self.entry_Fee.configure(fg="#000000")
+		else:self.entry_fee.configure(fg="#000000")
 
-		self.entry_Change.insert(0,"{:,.8f}".format(change))
-		self.entry_Change.configure(state='disabled')
+		self.entry_change_amt.insert(0,"{:,.8f}".format(change))
+		self.entry_change_amt.configure(state='disabled')
 
 		self.checkTxReady()
 		return True
 
 	def get_destinationList(self):#creates a list of addresses that receive funds in the tx
-		destination=[self.typedAddress.get(),(float)(self.typedAmount.get())]
-		destination_list=[destination]
+		destination_list=[]
+
+		for i in range(len(self.entry_address)):
+			
+			destination=[self.entry_address[i].get(),(float)(self.entry_amount[i].get())]
+			destination_list.append(destination)
 
 		if((float)(self.typedChange.get())>0):#Create Change Output
-				destination_list.append([global_.gl_gui_build_address.taproot_container.TapRootAddress[0],(float)(self.typedChange.get())])
+				destination_list.append([self.entry_change_address.get(),(float)(self.typedChange.get())])
 
 		return destination_list
 

@@ -25,6 +25,7 @@ def make_lambda(a):
 
 class class_gui():
 	def __init__(self):
+		return
 		self.root = tk.Tk()
 		self.root.title("TapRoot Wallet by https://twitter.com/BR_Robin . Only testnet recommended")
 		self.root.geometry("600x400")

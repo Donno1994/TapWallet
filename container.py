@@ -785,7 +785,8 @@ class c_Container_Taproot(c_Container):
 		if(merkleRoot):parents=[internalKey,merkleRoot]
 		else: parents=[internalKey]
 
-
+		if(len(self.TapRootAddress)>global_.gl_current_child_index):
+			global_.gl_current_child_index=len(self.TapRootAddress)-1
 		c_Container.__init__(self,x_pos,y_pos,label0="Taproot Address",label1=self.TapRootAddress[global_.gl_current_child_index],parent_array=parents,is_mine=True,has_extended_parent=has_extended_parent)
 		self.label_label0.config(text="Taproot Address")
 		if(y_pos>global_.gl_gui.guiy-self.sizeY):y_pos=global_.gl_gui.guiy-self.sizeY
@@ -810,6 +811,7 @@ class c_Container_Taproot(c_Container):
 		self.updateLine()
 		self.remove_unused_container()
 
+		
 		
 		
 
