@@ -1,6 +1,7 @@
 import copy
 import tkinter as tk
 from tkinter import ttk
+from tkinter.simpledialog import askstring
 import global_ 
 import bitcoinlib
 import test_framework
@@ -10,6 +11,7 @@ import taproot
 import blockchain
 from helperFunctions import *
 from musig1 import c_MultiSig
+from bitcoin_core_framework.script import hash160
 
 var=0
 def make_lambda(a):
@@ -944,6 +946,7 @@ class gui_build_address_canvas:
 				break
 		
 	def add_tapleaf_container(self,label,tapLeaf,timelockDelay,timelock,hash_,parent_array,x,is_mine=False,has_extended_parent=False):
+		print("THIS FUNCTION SHOUDL NOT BE USED ANYMORE.")
 		container_=container.c_Container_Script(label,tapLeaf,hash_,timelockDelay,timelock,parent_array,is_mine,has_extended_parent)
 		#add_hash_container()
 		parent=[]
@@ -1141,12 +1144,12 @@ class gui_transaction_tab:
 		self.entry_change_amt.place(y=52+num_addresses*25)
 		self.button_tx_ready.place(y=77+num_addresses*25)
 		self.scrollable_frame_tx.configure(height=num_addresses*25+140)
-		print("ADD: Num Addresses "+str((num_addresses)))
+		#print("ADD: Num Addresses "+str((num_addresses)))
 		self.canvas_tx.yview_moveto( 1 )
 
 	def kill_address_field(self,event=None,index=0):
-		print("KILL: Index "+str(index))
-		print("KILL: len(entry) "+str(len(self.entry_address)))
+		#print("KILL: Index "+str(index))
+		#print("KILL: len(entry) "+str(len(self.entry_address)))
 		self.label_address.pop(index).destroy()
 		self.entry_address.pop(index).destroy()
 		self.entry_amount.pop(index).destroy()
@@ -1163,7 +1166,7 @@ class gui_transaction_tab:
 			x=x+1
 
 		num_addresses=len(self.entry_address)
-		print("KILL: len(entry) "+str(len(self.entry_address)))
+		#print("KILL: len(entry) "+str(len(self.entry_address)))
 		self.button_add_address.place(y=52+num_addresses*25)
 		self.label_fee.place(y=52+num_addresses*25)
 		self.entry_fee.place(y=52+num_addresses*25)
@@ -1180,7 +1183,6 @@ class gui_transaction_tab:
 		self.active_canvas=self.canvas_tx
 
 	def _bind_canvas_utxo_to_mousewheel(self, event):
-		print("Bind")
 		self.canvas_utxo.bind_all("<MouseWheel>", self._canvas_tx_mousewheel)
 		self.active_canvas=self.canvas_utxo
 
@@ -1195,6 +1197,8 @@ class gui_transaction_tab:
 		print(index)
 
 	def checkTxReady(self,event=None):
+		self.button_tx_ready.configure(state="normal")
+
 		if(event is not None):
 			if (event.keycode==17 or event.keycode==16):return#Don't trigger when Shift or Control is released
 		ret=False
@@ -1690,6 +1694,20 @@ class gui_transaction_tab:
 		else: global_.gl_console.printText(text="\nError when broadcasting tx. Unknown response",keepOld=True)
 		
 
+	def prompt_to_enter_preimage(self):
+
+		x=askstring("Hashlock","Enter password/preimage")
+		print(x)
+
+		self.preimageWindow = tk.Toplevel(self.root)
+		self.preimageWindow.title("Info about your key")
+		self.preimageWindow.geometry("600x400")
+		
+
+		label1=tk.Label(self.scriptWindow,text="Label: "+str(self.label0))
+		label1.pack()
+		label1.place(x=5,y=5)
+
 	def createTX(self):
 
 		if(self.keyPathChosen):
@@ -1713,6 +1731,20 @@ class gui_transaction_tab:
 		
 		self.tx_scriptContainer=self.PathValueArray[radio][1]
 		pubContainer=self.tx_scriptContainer.parent_array[0]
+
+		self.tx_scriptContainer.hash160_preimage=None
+
+		if(self.tx_scriptContainer.hash160 is not None):
+			print("HASHLOCK ACTIVE: PLEASE INSERT PREIMAGE TO "+str(self.tx_scriptContainer.hash160.hex()))
+			#self.prompt_to_enter_preimage()
+			self.tx_scriptContainer.hash160_preimage=askstring("Hashlock","Enter password/preimage for hash\n"+str(self.tx_scriptContainer.hash160.hex()))
+
+			hash_160=hash160(self.tx_scriptContainer.hash160_preimage.encode())
+
+			if(hash_160!=self.tx_scriptContainer.hash160):
+				global_.gl_console.printText(text="Your input does not hash to the desired value")
+				return
+
 		print("pubcon")
 		print(pubContainer.privkey)
 		if(len(pubContainer.parent_array)==0):#If Pubkey has no parent, it is not a multisig
@@ -1725,7 +1757,7 @@ class gui_transaction_tab:
 					privkey_list.append(pubContainer.privkey[address_index])
 					script_list.append(self.tx_scriptContainer.script[address_index])
 			tx=taproot.SpendTransactionViaScriptPath(global_.gl_gui_build_address.taproot_container,self.get_destinationList(),privkey_list,
-							script_list,self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock)
+							script_list,self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock,self.tx_scriptContainer.hash160_preimage)
 			global_.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
 			self.broadcastWindow(tx)
 			return
@@ -1899,7 +1931,7 @@ class gui_transaction_tab:
 						address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
 						script_list.append(self.tx_scriptContainer.script[address_index])
 				tx=taproot.SpendTransactionViaScriptPath(global_.gl_gui_build_address.taproot_container,self.get_destinationList(),priv_list,
-							script_list,self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock)
+							script_list,self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock,self.tx_scriptContainer.hash160_preimage)
 				global_.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
 				self.broadcastWindow(tx)
 			return

@@ -1,8 +1,7 @@
-def shortenHexString(longString,mediumLength=False):
+def shortenHexString(longString,length_a=8,length_b=5):
 
-	a=8
-	b=-5
-	if mediumLength:a=14;b=-11
+	a=length_a
+	b=-length_b
 	shortString=longString[:a]
 	shortString+="....."
 	shortString+=longString[b:]

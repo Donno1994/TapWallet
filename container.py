@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 import global_ 
 import bitcoinlib
+from bitcoin_core_framework.script import hash160,hash256,sha256,ripemd160
+
 import test_framework
 import random
 import taproot
@@ -71,7 +73,7 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 
 		#text.place(height=15, x=1, y=2)
 
-		self.label_label0=tk.Label(self.container)#Example: PubKey: Alice
+		self.label_label0=tk.Label(self.container,text="Script: "+str(self.label0))#Example: PubKey: Alice
 		self.label_label0.pack()
 		self.label_label0.place(height=15, x=14, y=2)
 		self.label_label0.bind('<Button-1>', self.onClick)
@@ -216,8 +218,8 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 				self.highlightContainer.config(text="PubKey: "+str(self.label0))
 			if(isinstance(self,c_Container_Script)):
 				self.sizeY=self.sizeY+20
-				self.label_label0.config(text=str(self.label0))
-				self.highlightContainer.config(text=str(self.label0))
+				self.label_label0.config(text="Script: "+str(self.label0))
+				self.highlightContainer.config(text="Script: "+str(self.label0))
 
 		else:
 			self.isMini=True
@@ -457,13 +459,42 @@ class c_Container_PubKey (c_Container):
 		self.editAbsTimelock.pack()
 		self.editAbsTimelock.place(height=15,width=50,x=275,y=42)
 		
-		labelPassword=tk.Label(scriptFrame,text="Add a hashlock to script: <<Not supported yet>>")
-		labelPassword.pack()
-		labelPassword.place(height=15,x=5,y=160)
+		label_hashlock=tk.Label(scriptFrame,text="Add a hashlock to script:")
+		label_hashlock.pack()
+		label_hashlock.place(height=15,x=5,y=160)
 
-		buttonScript=tk.Button(scriptFrame,text="Create Script", command=self.createScript,bg="#DC7A7A")
-		buttonScript.pack()
-		buttonScript.place(height=20,width=100,x=5,y=235)
+		self.radioHashlockVar=tk.IntVar(value=1)
+		radioTimelock0=tk.Radiobutton(scriptFrame,text="No Hashlock",variable=self.radioHashlockVar,value=1,command=self.showNoHashlock)
+		radioTimelock0.pack()
+		radioTimelock0.place(x=150,y=158)
+		radioTimelock1=tk.Radiobutton(scriptFrame,text="Add Hashlock",variable=self.radioHashlockVar,value=2,command=self.showHashlock)
+		radioTimelock1.pack()
+		radioTimelock1.place(x=250,y=158)
+
+		self.label_preimage_value=tk.Label(scriptFrame,text="Enter Preimage:")
+		self.label_preimage_value.pack()
+		self.label_preimage_value.place(height=15,x=5,y=185)
+
+		self.editHashlock=tk.Entry(scriptFrame)
+		self.editHashlock.pack()
+		self.editHashlock.place(height=15,width=300,x=150,y=185)
+		self.editHashlock.bind("<KeyRelease>", self.calc_hashlock)
+
+		self.label_hash_value=tk.Label(scriptFrame,text="Hash160 Value:")
+		self.label_hash_value.pack()
+		self.label_hash_value.place(height=15,x=5,y=210)
+
+		self.edit_show_hash160=tk.Entry(scriptFrame,state='disabled')
+		self.edit_show_hash160.pack()
+		self.edit_show_hash160.place(height=15,width=300,x=150,y=210)
+
+		self.hash160=None
+
+		self.buttonScript=tk.Button(scriptFrame,text="Create Script", command=self.createScript,bg="#DC7A7A")
+		self.buttonScript.pack()
+		self.buttonScript.place(height=20,width=100,x=5,y=235)
+
+		self.showNoHashlock()
 
 		taprootFrame = tk.LabelFrame(self.scriptWindow)
 		taprootFrame.pack()
@@ -497,6 +528,54 @@ class c_Container_PubKey (c_Container):
 		self.containerAbsTimelock.place(height=75,width=400,x=150,y=80)
 		self.editRelTimelock.delete(0, 'end')
 
+	def showNoHashlock(self):
+		self.label_preimage_value.place_forget()
+		self.editHashlock.place_forget()
+		self.label_hash_value.place_forget()
+		self.edit_show_hash160.place_forget()
+
+		self.editHashlock.delete(0, 'end')
+		self.edit_show_hash160.configure(state='normal',fg="#000000")
+		self.edit_show_hash160.delete(0, 'end')
+		self.edit_show_hash160.insert(0,"Enter a password above")
+		self.edit_show_hash160.configure(state='disabled')
+		self.buttonScript.configure(state='normal')
+
+		self.hash160=None
+
+	def showHashlock(self):
+		self.label_preimage_value.place(height=15,x=5,y=185)
+		self.editHashlock.place(height=15,width=300,x=150,y=185)
+		self.label_hash_value.place(height=15,x=5,y=210)
+		self.edit_show_hash160.place(height=15,width=300,x=150,y=210)
+
+		self.calc_hashlock()
+
+	def calc_hashlock(self,event=None):
+		#preimage=bytes.fromhex(self.editHashlock.get())  interpret input as hex number
+		preimage=self.editHashlock.get().encode()        #interpret input as string
+		print("Preimage "+str(preimage))
+		if(len(preimage)<10):
+			self.edit_show_hash160.configure(state='normal',fg="#ff0000")
+			self.edit_show_hash160.delete(0, 'end')
+			self.edit_show_hash160.insert(0,"Your input is too short. This can be brute forced easily.")
+			self.edit_show_hash160.configure(state='disabled')
+			self.buttonScript.configure(state='disabled')
+			self.hash160=None
+			return
+		else:
+			self.edit_show_hash160.configure(state='normal',fg="#000000")
+			self.buttonScript.configure(state='normal')
+		
+		
+		hash_160=hash160(preimage)
+		print("Hash160: "+str(hash_160.hex()))
+
+		self.edit_show_hash160.delete(0, 'end')
+		self.edit_show_hash160.insert(0,str(hash_160.hex()))
+		self.edit_show_hash160.configure(state='disabled')
+
+		self.hash160=hash_160
 
 	def createScript(self):
 
@@ -525,6 +604,7 @@ class c_Container_PubKey (c_Container):
 
 		timelockdelay=0
 		timelock=0
+		
 
 		if(len(self.editRelTimelock.get())>0):
 			timelockdelay=int(self.editRelTimelock.get())
@@ -536,7 +616,9 @@ class c_Container_PubKey (c_Container):
 
 		for i in range(0,len(self.pubkey)):
 			
-			tapL,tapleaf_h=taproot.construct_Tapleaf(self.pubkey[i],timelockdelay,timelock)
+			tapL,tapleaf_h=taproot.construct_Tapleaf(self.pubkey[i],timelockdelay,timelock,self.hash160)
+			if(tapL is None or tapleaf_h is None):
+				return
 			print("Adding Script: "+tapL.script.hex()+" for Pubkey: "+str(self.pubkey)+"  TimeLockRel: "+str(timelockdelay)+"  TimeLockAbs: "+str(timelock))
 			print("Adding TapBranch: "+tapleaf_h.hex()+" for Script: ",tapL.script.hex())
 			tapLeaf.append(tapL)
@@ -547,7 +629,7 @@ class c_Container_PubKey (c_Container):
 		parent_array=[]
 		parent_array.append(self)
 		
-		child=c_Container_Script(self.editLabel.get(),tapLeaf,tapleaf_hash,timelockdelay,timelock,parent_array,self.is_mine,self.has_extended_parent)
+		child=c_Container_Script(self.editLabel.get(),tapLeaf,tapleaf_hash,timelockdelay,timelock,self.hash160,parent_array,self.is_mine,self.has_extended_parent)
 		global_.gl_gui_build_address.script_container_array.append(child)
 		
 		
@@ -558,25 +640,27 @@ class c_Container_PubKey (c_Container):
 
 	
 	def update_index(self):
-		if len(self.pubkey)==1:txt="\n"+str(shortenHexString(str(self.pubkey[0]),True))
+		if len(self.pubkey)==1:txt="\n"+str(shortenHexString(str(self.pubkey[0]),14,11))
 		else:
 			if(len(self.parent_array)>0):
 				txt=("Extended Key not available"+"\nIndex:"+
 					str(global_.gl_current_child_index)+":"+
-					str(shortenHexString(str(self.pubkey[global_.gl_current_child_index]),True)))
+					str(shortenHexString(str(self.pubkey[global_.gl_current_child_index]),14,11)))
 			else:
-				txt=(str(shortenHexString(str(self.ext_key.wif_public()),True))+"\nIndex:"+
+				txt=(str(shortenHexString(str(self.ext_key.wif_public()),14,11))+"\nIndex:"+
 					str(global_.gl_current_child_index)+":"+
-					str(shortenHexString(str(self.pubkey[global_.gl_current_child_index]),True)))
+					str(shortenHexString(str(self.pubkey[global_.gl_current_child_index]),14,11)))
 		self.label_label1.config(text=txt)
 
 class c_Container_Script(c_Container):
-	def __init__(self,label,tapleaf,hash_,timelockDelay,timelock,parent_array,is_mine=False,has_extended_parent=False):
+	def __init__(self,label,tapleaf,hash_,timelockDelay,timelock,hash160,parent_array,is_mine=False,has_extended_parent=False):
 		x=parent_array[0].x_pos
 		y=parent_array[0].y_pos+parent_array[0].sizeY+10
 
 		self.timelockDelay=timelockDelay
 		self.timelock=timelock
+		self.hash160=hash160
+		self.hash160_preimage=None
 		self.tapLeaf=tapleaf
 		self.script=[]
 		self.hash_=hash_
@@ -595,7 +679,7 @@ class c_Container_Script(c_Container):
 		self.highlightContainer.config(text=str(label))
 		
 		
-		self.label_label3=tk.Label(self.container,text="Hash "+str(index)+": "+str(shortenHexString(str(hash_[index].hex()),True)),bg="#16e971")
+		self.label_label3=tk.Label(self.container,text="Hash "+str(index)+": "+str(shortenHexString(str(hash_[index].hex()),14,11)),bg="#16e971")
 		self.label_label3.pack()
 		self.label_label3.place(x=0, y=52,height=20,width=self.sizeX-5)
 		self.label_label3.bind('<Button-1>', self.onClick)
@@ -608,13 +692,20 @@ class c_Container_Script(c_Container):
 		self.container.place(height=self.sizeY,width=self.sizeX, x=self.x_pos,y=self.y_pos)
 
 		self.updateLine()
-		txt="Script: "+str(shortenHexString(str(self.script[index].hex()),True))
-			
-		if(self.timelockDelay>0):txt=txt+"\nRelative Timelock: "+str(self.timelockDelay)
-		elif(self.timelock>0):txt=txt+"\nAbsolute Timelock: "+str(self.timelock)
-		else:txt=txt+"\nNo Timelock"
+		txt="Script: "+str(shortenHexString(str(self.script[index].hex()),14,11)+"\n")
+		
+		if(self.timelockDelay>0):txt=txt+"Rel Timelock: "+str(self.timelockDelay)
+		elif(self.timelock>0):txt=txt+"Abs Timelock: "+str(self.timelock)
+
+
+		if(self.hash160 is not None):
+			if(self.timelockDelay>0 or self.timelock>0):
+				txt+=" Hashlock: "+str(shortenHexString(self.hash160.hex(),3,3))
+			else:
+				txt+=" Hashlock: "+str(shortenHexString(self.hash160.hex(),14,11))
+
 		self.label_label1.config(text=txt)
-		self.label_label3.config(text="Hash "+str(index)+": "+str(shortenHexString(str(self.hash_[index].hex()),True)))
+		self.label_label3.config(text="Hash "+str(index)+": "+str(shortenHexString(str(self.hash_[index].hex()),14,11)))
 
 	def doubleClick(self,event):
 		if(event.state==12):return#Control key is pressed -> flag function is called
@@ -622,6 +713,9 @@ class c_Container_Script(c_Container):
 		self.scriptWindow = tk.Toplevel(self.root)
 		self.scriptWindow.title("See Script Details")
 		self.scriptWindow.geometry("650x120")
+
+		maximum_index=len(self.tapLeaf)-1
+		index=min(maximum_index,global_.gl_current_child_index)
 
 		label=tk.Label(self.scriptWindow,text="Script:    "+str(self.label0)+":")
 		label.pack()
@@ -645,16 +739,36 @@ class c_Container_Script(c_Container):
 			label=tk.Label(self.scriptWindow,text="Relative TimeLock: ")
 			data_string = tk.StringVar()
 			data_string.set(str(self.timelockDelay))
-		if(self.timelock>0):
+		elif(self.timelock>0):
 			label=tk.Label(self.scriptWindow,text="Absolute TimeLock: ")
 			data_string = tk.StringVar()
 			data_string.set(str(self.timelock))
+		else:
+			label=tk.Label(self.scriptWindow,text="TimeLock: None")
+		
+		label.pack()
+		label.place(x=5,y=65)
+
 		if(self.timelockDelay>0 or self.timelock>0):
-			label.pack()
-			label.place(x=5,y=65)
 			e=tk.Entry(self.scriptWindow,textvariable=data_string,fg="black",bg="white",bd=0,state="readonly")
 			e.pack()
 			e.place(x=150,y=67,width=400)
+
+		if(self.hash160 is not None):
+			label=tk.Label(self.scriptWindow,text="Hashlock (HASH160):")
+			label.pack()
+			label.place(x=5,y=90)
+			data_string = tk.StringVar()
+			data_string.set(str(self.hash160.hex()))
+			e=tk.Entry(self.scriptWindow,textvariable=data_string,fg="black",bg="white",bd=0,state="readonly")
+			e.pack()
+			e.place(x=150,y=92,width=400)
+
+		else:
+			label=tk.Label(self.scriptWindow,text="Hashlock (HASH160): None")
+			label.pack()
+			label.place(x=5,y=90)
+
 
 	def createTapbranch(self):
 		tapBranch,hash_=tapTree.construct_Tapbranch(self.script)
@@ -666,13 +780,13 @@ class c_Container_Script(c_Container):
 	
 	def update_index(self):
 		if(len(self.tapLeaf)<2):return
-		txt="Script: "+str(shortenHexString(str(self.script[global_.gl_current_child_index].hex()),True))
+		txt="Script: "+str(shortenHexString(str(self.script[global_.gl_current_child_index].hex()),14,11))
 			
 		if(self.timelockDelay>0):txt=txt+"\nRelative Timelock: "+str(self.timelockDelay)
 		elif(self.timelock>0):txt=txt+"\nAbsolute Timelock: "+str(self.timelock)
 		else:txt=txt+"\nNo Timelock"
 		self.label_label1.config(text=txt)
-		self.label_label3.config(text="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),True)))
+		self.label_label3.config(text="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),14,11)))
 
 
 
@@ -707,14 +821,14 @@ class c_Container_Hash(c_Container):
 		self.updateLine()
 		if(len(self.parent_array)==1):self.buttonExit.destroy()
 
-		txt="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),True))
+		txt="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),14,11))
 		self.label_label1.config(text=txt)
 
 
 	
 
 	def update_index(self):
-		txt="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),True))
+		txt="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),14,11))
 		self.label_label1.config(text=txt)
 
 class c_Container_Taproot(c_Container):
@@ -804,7 +918,7 @@ class c_Container_Taproot(c_Container):
 		global_.gl_gui_build_address.canvasUTXO=None
 		self.scrollable_frame=None
 
-		txt=str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.TapRootAddress[global_.gl_current_child_index]),True))
+		txt=str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.TapRootAddress[global_.gl_current_child_index]),14,11))
 		self.label_label1.config(text=txt)
 
 		
@@ -865,7 +979,7 @@ class c_Container_Taproot(c_Container):
 
 	def update_index(self):
 		
-		txt=str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.TapRootAddress[global_.gl_current_child_index]),True))
+		txt=str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.TapRootAddress[global_.gl_current_child_index]),14,11))
 		self.label_label1.config(text=txt)
 
 	def get_index_of_address(self,address):

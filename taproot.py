@@ -12,15 +12,21 @@ import console
 
 TAPSCRIPT_VER = bytes([0xc0])
 
-def construct_Tapleaf(pubKey,timeLockdelay=0,timeLock=0,password=None):
-    tapLeaf_=0
-    if(timeLockdelay==0 and timeLock==0):tapLeaf_=TapLeaf().construct_pk(pubKey)
-    elif (timeLockdelay>0):
-        tapLeaf_=TapLeaf().construct_pk(pubKey)
-        tapLeaf_.script=bytes.fromhex(tapLeaf_.script.hex()+getTimelockDelayBytesForScript(timeLockdelay).hex())
-    else:
-        tapLeaf_=TapLeaf().construct_pk(pubKey)
-        tapLeaf_.script=bytes.fromhex(tapLeaf_.script.hex()+getTimelockBytesForScript(timeLock).hex())
+def construct_Tapleaf(pubKey,timeLockdelay=0,timeLock=0,hash160=None):
+    tapLeaf_=TapLeaf().construct_pk(pubKey)
+
+    if(hash160 is not None):
+        hashlock_bytes=get_hashlock_bytes_for_script(hash160)#OP_HASH160 <hash160> OP_EQUAL
+        tapLeaf_.script=bytes.fromhex(hashlock_bytes.hex()+tapLeaf_.script.hex())
+
+
+    if (timeLockdelay>0):
+        timelock_bytes=get_timelockdelay_bytes_for_script(timeLockdelay)
+        tapLeaf_.script=bytes.fromhex(timelock_bytes.hex()+tapLeaf_.script.hex())
+    elif timeLock>0:
+        timelock_bytes=get_timelock_bytes_for_script(timeLock)
+        if(timelock_bytes is None):return None,None
+        tapLeaf_.script=bytes.fromhex(timelock_bytes.hex()+tapLeaf_.script.hex())
     tapleaf_hash=tagged_hash("TapLeaf", TAPSCRIPT_VER + ser_string(tapLeaf_.script))
     return tapLeaf_, tapleaf_hash
 
@@ -62,7 +68,9 @@ def createUnsignedTX(taprootObject,destination_list,timeLockDelay=0,timeLock=0):
             if(timeLockDelay>0):nSequence=timeLockDelay
             if(timeLock>0):nSequence=0xFFFFFFFE
             spending_tx_in = CTxIn(outpoint=outpoint,nSequence=nSequence)
+            print("Spending TX IN "+str(spending_tx_in))
             spending_tx.vin.append(spending_tx_in)
+            
             address_index=taprootObject.get_index_of_address(utxo[1]['address'])
             dest_input=CTxOut(nValue=int(inputAmount * 100_000_000),scriptPubKey=bytes.fromhex(address_to_scriptPubKey(taprootObject.TapRootAddress[address_index])))
             input_tx.vout.append(dest_input)
@@ -91,7 +99,7 @@ def sign_output_with_single_key(spending_tx,input_tx,input_index,privkey,script)
 
     return signature
 
-def sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,script_list=None):
+def sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,script_list=None,hash160_preimage=None):
     input_tx_counter=0
     print("SignTX")
     print(privkey_list)
@@ -126,7 +134,12 @@ def sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,sc
                 address_index=taprootObject.get_index_of_address(utxo[1]['address'])
                 print("Address Index "+str(address_index))
                 controlMap=taprootObject.control_map[address_index]
-                witness_elements = [signature, script_list[priv_key_index], controlMap[script_list[priv_key_index]]]
+                
+                if(hash160_preimage is None):
+                    witness_elements = [signature, script_list[priv_key_index], controlMap[script_list[priv_key_index]]]
+                else:
+                    witness_elements = [signature,hash160_preimage.encode(), script_list[priv_key_index], controlMap[script_list[priv_key_index]]]
+
                 spending_tx.wit.vtxinwit.append(CTxInWitness(witness_elements))
 
             input_tx_counter+=1
@@ -191,10 +204,10 @@ def SpendTransactionViaKeyPath(taprootObject,privkey_list,destination_list,chang
 
     return signedTX
 
-def SpendTransactionViaScriptPath(taprootObject,destination_list,privkey_list,script,timelockDelay,timeLock,address_index_from_short_list=False):
+def SpendTransactionViaScriptPath(taprootObject,destination_list,privkey_list,script,timelockDelay,timeLock,hash160_preimage,address_index_from_short_list=False):
         
     spending_tx,input_tx=createUnsignedTX(taprootObject,destination_list,timelockDelay,timeLock)
-    signedTX=sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,script)
+    signedTX=sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,script,hash160_preimage)
 
     return signedTX
 
@@ -333,38 +346,62 @@ def address_to_scriptPubKey(address):
 
     return None
 
-def getTimelockDelayBytesForScript(timeLock):
+def get_timelockdelay_bytes_for_script(timeLock):
+    #takes the timelock and constructs CSV bytes
+    #timelock=20 -> 20 OP_CSV OP_DROP
+
     if(timeLock>=65536):return None
 
-    timeLockBytes =  bytearray()
+    timelock_bytes =  bytearray()
     if(timeLock<=16):
-        timeLockBytes.append(0x50+timeLock)
+        timelock_bytes.append(0x50+timeLock)
     else:
         lockBytes=bn2vch(timeLock)
+        timelock_bytes.append(len(lockBytes))
         for byte in lockBytes:
             
-            timeLockBytes.append(byte)
+            timelock_bytes.append(byte)
 
-    timeLockBytes.append(0xb2)#OP_CSV
-    timeLockBytes.append(0x75)#OP_DROP
-    #print(timeLockBytes.hex())
-    return timeLockBytes
+    timelock_bytes.append(0xb2)#OP_CSV
+    timelock_bytes.append(0x75)#OP_DROP
+    return timelock_bytes
 
-def getTimelockBytesForScript(timeLock):
+def get_timelock_bytes_for_script(timeLock):
+    #takes the timelock and constructs CLTV bytes
+    #timelock=710000 -> 710000 OP_CLTV OP_DROP
+
     if(timeLock>=16777216):return None
 
-    timeLockBytes =  bytearray()
+    timelock_bytes =  bytearray()
     if(timeLock<=16):
-        timeLockBytes.append(0x50+timeLock)
+        timelock_bytes.append(0x50+timeLock)
     else:
         lockBytes=bn2vch(timeLock)
-        timeLockBytes.append(len(lockBytes))
+        timelock_bytes.append(len(lockBytes))
         for byte in lockBytes:
             
-            timeLockBytes.append(byte)
+            timelock_bytes.append(byte)
         
-    timeLockBytes.append(0xb1)#OP_CLTV
-    timeLockBytes.append(0x75)#OP_DROP
-    if(timeLockBytes[-3]>=0x80):print("ERROR in TapTreeClass: getTimelockBytesForScript - signed integer would be negative")
+    timelock_bytes.append(0xb1)#OP_CLTV
+    timelock_bytes.append(0x75)#OP_DROP
+    if(timelock_bytes[-3]>=0x80):
+        print("ERROR in TapTreeClass: getTimelockBytesForScript - signed integer would be negative")
+        global_.gl_console(text="ERROR in TapTreeClass: getTimelockBytesForScript - signed integer would be negative")
+        return None
 
-    return timeLockBytes
+    return timelock_bytes
+
+def get_hashlock_bytes_for_script(hash160):
+    #takes the hash160 value  from hashlock hash function and constructs hashlock bytes
+    #if the preimage (password) was "this was my password", hash160 will be 66e69497861bf78fea724d82f442eefaa191e0ca ->
+    # OP_HASH160 20 66e69497861bf78fea724d82f442eefaa191e0ca OP_EQUAL
+
+    hashlock_bytes =  bytearray()
+    hashlock_bytes.append(0xa9)#OP_HASH160
+    hashlock_bytes.append(0x14)#PUSH_20
+    for byte in hash160:
+        hashlock_bytes.append(byte)
+    hashlock_bytes.append(0x88)#OP_EQUALVERIFY
+
+    return hashlock_bytes
+
