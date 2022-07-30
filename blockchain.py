@@ -3,6 +3,7 @@ import global_
 import bitcoinlib
 
 def initService():
+	print("Connecting to blockchain explorer to check for available UTXOs")
 	global_.gl_gui_service=bitcoinlib.services.services.Service(network="testnet",providers=["blockstream"])
 
 def startThread(function):
@@ -25,15 +26,16 @@ def thread_balance():
 def get_utxos_from_address_list():
 	balance_list=[["Type","Index","Address","Label","Balance"]]
 	utxo_list=[]
-	print("Connecting to blockchain explorer to check for available UTXOs")
+	
 	if(global_.gl_gui_build_address.taproot_container is not None):
 		index=0
 		for taproot_address in global_.gl_gui_build_address.taproot_container.TapRootAddress:
-			utxos=global_.gl_gui_service.getutxos(taproot_address)
 			balance=0
-			for utxo in utxos:
-				balance=balance+utxo['value']
-				utxo_list.append(utxo)
+			if(global_.gl_gui_service is not None):
+				utxos=global_.gl_gui_service.getutxos(taproot_address)
+				for utxo in utxos:
+					balance=balance+utxo['value']
+					utxo_list.append(utxo)
 
 			balance_list.append(["receive",index,taproot_address,"label",balance])
 			index=index+1

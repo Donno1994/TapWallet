@@ -47,6 +47,7 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 
 		self.has_extended_parent=has_extended_parent # True, if at least one parent is an extended key. Then this key can't be calculated until a child key is derived
 
+		global_.gl_gui.bool_ask_for_save=True
 		
 
 		self.container = tk.LabelFrame(self.root)
@@ -232,19 +233,28 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 
 		self.container.place(height=self.sizeY,width=self.sizeX, x=self.x_pos,y=self.y_pos)
 
-	def remove_container(self):
-
+	def remove_container(self,ask_for_confirmation=True):
+		
+		if(ask_for_confirmation):
+			answer = tk.messagebox.askyesno(title='Sure to delete container?',
+						message=("If you delete this container, all child containers will be deleted as well, including your taproot address.\n"
+								"If you have funds on your addresses, you must know how to recreate your taproot address, or you lose your money.\n\n"
+								"Are you sure you want to delete this container?"))
+	
+			if(answer==False):
+				return
 		for i in range(0,len(self.parent_array)):
 			global_.gl_gui_build_address.canvas.delete(self.line[i])
 
 		for i in range(0,len(self.childList)):
-			self.childList[i].remove_container()
+			self.childList[i].remove_container(False)
 
 		for i in range(0,len(global_.gl_selected_container)):
 			if(global_.gl_selected_container[i]==self):
 				global_.gl_selected_container.remove(self)
 
 		global_.gl_gui_build_address.removeKeyContainer(self)
+		global_.gl_gui.bool_ask_for_save=True
 		self.container.destroy()
 
 	def updateLine(self):
@@ -341,6 +351,8 @@ class c_Container_PubKey (c_Container):
 		self.tab2=0
 		self.editLabel=0
 
+		self.hash160=None
+
 		if(isinstance(privKey,test_framework.ECKey)):
 			if(len(str(privKey))>5):
 				print("Adding KeyPair: ",str(hex(privKey.secret))[2:]," - ",str(privKey.get_pubkey()))
@@ -357,8 +369,6 @@ class c_Container_PubKey (c_Container):
 				if(self.ext_key.secret is not None):
 					prv=test_framework.ECKey().set(self.ext_key.child_private(0).child_private(i).secret)
 				else:prv=None
-				#print("hex")
-				#print(self.ext_key.child_public(0).child_public(i).public_byte)
 				pub=test_framework.ECPubKey().set(self.ext_key.child_public(0).child_public(i).public_byte)
 				if(pub.get_y()%2!=0):
 					if(prv is not None):prv.negate()
@@ -488,7 +498,7 @@ class c_Container_PubKey (c_Container):
 		self.edit_show_hash160.pack()
 		self.edit_show_hash160.place(height=15,width=300,x=150,y=210)
 
-		self.hash160=None
+		
 
 		self.buttonScript=tk.Button(scriptFrame,text="Create Script", command=self.createScript,bg="#DC7A7A")
 		self.buttonScript.pack()
@@ -577,66 +587,66 @@ class c_Container_PubKey (c_Container):
 
 		self.hash160=hash_160
 
-	def createScript(self):
+	def createScript(self,label=None,x_pos=None,y_pos=None,timelockdelay=None,timelock=None,hash160=None):
 
 		if(global_.gl_gui_build_address.taproot_container):
 			global_.gl_console.printText("Can't create a script when taproot address is already created")
 			return
 
-		if(len(self.editRelTimelock.get())>0):
-			if(self.editRelTimelock.get().isnumeric()==False):
-				global_.gl_console.printText("TimeLock must be a positive number or empty")
-				return
-			if(int (self.editRelTimelock.get())>65535 or int (self.editRelTimelock.get())<=0):
-				global_.gl_console.printText("Rel TimeLock must be between 1 and 65535")
-				return
+		if(label is None):label=self.editLabel.get()
 
-		elif(len(self.editAbsTimelock.get())>0):
-			if(self.editAbsTimelock.get().isnumeric()==False):
-				global_.gl_console.printText("TimeLock must be a positive number or empty")
-				return
-			if(int (self.editAbsTimelock.get())>16777216 or int(self.editAbsTimelock.get())<=0):
-				global_.gl_console.printText("Abs TimeLock must be bewteen 1 and 16777216")
-				return
+		if(timelockdelay is None and timelock is None):
+			timelockdelay=0
+			timelock=0
 
+			if(len(self.editRelTimelock.get())>0):
+				if(self.editRelTimelock.get().isnumeric()==False):
+					global_.gl_console.printText("TimeLock must be a positive number or empty")
+					return
+				if(int (self.editRelTimelock.get())>65535 or int (self.editRelTimelock.get())<=0):
+					global_.gl_console.printText("Rel TimeLock must be between 1 and 65535")
+					return
 
-		
+			elif(len(self.editAbsTimelock.get())>0):
+				if(self.editAbsTimelock.get().isnumeric()==False):
+					global_.gl_console.printText("TimeLock must be a positive number or empty")
+					return
+				if(int (self.editAbsTimelock.get())>16777216 or int(self.editAbsTimelock.get())<=0):
+					global_.gl_console.printText("Abs TimeLock must be bewteen 1 and 16777216")
+					return
 
-		timelockdelay=0
-		timelock=0
-		
+			if(len(self.editRelTimelock.get())>0):
+				timelockdelay=int(self.editRelTimelock.get())
+			elif(len(self.editAbsTimelock.get())>0):
+				timelock=int(self.editAbsTimelock.get())
 
-		if(len(self.editRelTimelock.get())>0):
-			timelockdelay=int(self.editRelTimelock.get())
-		elif(len(self.editAbsTimelock.get())>0):
-			timelock=int(self.editAbsTimelock.get())
+		if(hash160 is None and self.hash160 is not None):hash160=self.hash160
 
 		tapLeaf=[]
 		tapleaf_hash=[]
 
 		for i in range(0,len(self.pubkey)):
 			
-			tapL,tapleaf_h=taproot.construct_Tapleaf(self.pubkey[i],timelockdelay,timelock,self.hash160)
+			tapL,tapleaf_h=taproot.construct_Tapleaf(self.pubkey[i],timelockdelay,timelock,hash160)
 			if(tapL is None or tapleaf_h is None):
 				return
-			print("Adding Script: "+tapL.script.hex()+" for Pubkey: "+str(self.pubkey)+"  TimeLockRel: "+str(timelockdelay)+"  TimeLockAbs: "+str(timelock))
-			print("Adding TapBranch: "+tapleaf_h.hex()+" for Script: ",tapL.script.hex())
 			tapLeaf.append(tapL)
 			tapleaf_hash.append(tapleaf_h)
-		else:
-			print("Adding Script for extended key")
 
 		parent_array=[]
 		parent_array.append(self)
 		
-		child=c_Container_Script(self.editLabel.get(),tapLeaf,tapleaf_hash,timelockdelay,timelock,self.hash160,parent_array,self.is_mine,self.has_extended_parent)
+		child=c_Container_Script(label,tapLeaf,tapleaf_hash,x_pos,y_pos,timelockdelay,timelock,hash160,parent_array,self.is_mine,self.has_extended_parent)
 		global_.gl_gui_build_address.script_container_array.append(child)
 		
 		
 		self.childList.append(child)
 		child.onMove(None)
 
-		self.scriptWindow.destroy()
+		try:
+			self.scriptWindow.destroy()
+		except:
+			pass
 
 	
 	def update_index(self):
@@ -653,9 +663,10 @@ class c_Container_PubKey (c_Container):
 		self.label_label1.config(text=txt)
 
 class c_Container_Script(c_Container):
-	def __init__(self,label,tapleaf,hash_,timelockDelay,timelock,hash160,parent_array,is_mine=False,has_extended_parent=False):
-		x=parent_array[0].x_pos
-		y=parent_array[0].y_pos+parent_array[0].sizeY+10
+	def __init__(self,label,tapleaf,hash_,x=None,y=None,timelockDelay=0,timelock=0,hash160=None,parent_array=[],is_mine=False,has_extended_parent=False):
+		
+		if(x is None):x=parent_array[0].x_pos
+		if(y is None):y=parent_array[0].y_pos+parent_array[0].sizeY+10
 
 		self.timelockDelay=timelockDelay
 		self.timelock=timelock
@@ -869,7 +880,6 @@ class c_Container_Taproot(c_Container):
 				self.tapTweak_bytes.append(taptree[1])
 				self.taptree.append(taptree)
 
-			#print([taprootObject])
 			taproot_pubkey_b = self.internalKey.pubkey[a].tweak_add(self.tapTweak_bytes[i]).get_bytes()
 			self.TapRootAddress.append(test_framework.program_to_witness(1, taproot_pubkey_b,main=global_.gl_mainnet))
 			self.tapTweak.append(test_framework.ECKey().set(self.tapTweak_bytes[i]))
@@ -882,15 +892,10 @@ class c_Container_Taproot(c_Container):
 					tweak_p,pub=test_framework.generate_bip340_key_pair(tweak_p.secret)#createTapRootFromPriv(str(self.tweaked_privkey.secret))[0]
 					self.tweaked_privkey.append(tweak_p)
 			
-			#print("NEW: "+str(self.tweakedPubkey)+" : "+str(self.tweakedPubkey.get_y()))
-			#self.negated=False
 			if(self.tweakedPubkey[i].get_y()%2!=0):
-				#print("New Not Even")
 				self.tweakedPubkey[i].negate()
 				self.tapTweak[i].negate()
 				self.internalKey.pubkey[i].negate()
-				#self.internalKey.privkey.negate()
-				#self.negated=True
 
 			if(len(self.internalKey.pubkey)==1 and self.merkleRoot==None):break
 			if(len(self.internalKey.pubkey)==1 and len(self.merkleRoot.tapLeaf)==1):break
@@ -924,7 +929,7 @@ class c_Container_Taproot(c_Container):
 		
 		self.updateLine()
 		self.remove_unused_container()
-
+		
 		
 		
 		
@@ -972,10 +977,31 @@ class c_Container_Taproot(c_Container):
 					container.remove_container()
 				else:a+=1
 		
-	def remove_container(self):
+	def remove_container(self,ask_for_confirmation=True):
 		
-		super().remove_container()
+		if(ask_for_confirmation):
+			answer = tk.messagebox.askyesno(title='Sure to delete container?',
+						message=("If you delete this container, all child containers will be deleted as well, including your taproot address.\n"
+								"If you have funds on your addresses, you must know how to recreate your taproot address, or you lose your money.\n\n"
+								"Are you sure you want to delete this container?"))
+	
+			if(answer==False):
+				return
+		
+		super().remove_container(False)
+		try:
+			del global_.gl_gui_build_address.taproot_container.utxoList[:]
+		except:
+			pass
 		global_.gl_gui_build_address.taproot_container=None
+		global_.gl_gui_address_tab.button_checkBalance.place_forget()
+		global_.gl_gui_transaction_tab.button_checkBalance.place_forget()
+		global_.gl_gui_key.init_page_1()
+
+		global_.gl_gui_transaction_tab.label_selected.config(text="Selected Coins: 0 BTC")
+		for child in global_.gl_gui_transaction_tab.scrollable_frame_utxo.winfo_children():
+			child.destroy()
+		
 
 	def update_index(self):
 		

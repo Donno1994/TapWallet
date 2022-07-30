@@ -68,7 +68,6 @@ def createUnsignedTX(taprootObject,destination_list,timeLockDelay=0,timeLock=0):
             if(timeLockDelay>0):nSequence=timeLockDelay
             if(timeLock>0):nSequence=0xFFFFFFFE
             spending_tx_in = CTxIn(outpoint=outpoint,nSequence=nSequence)
-            print("Spending TX IN "+str(spending_tx_in))
             spending_tx.vin.append(spending_tx_in)
             
             address_index=taprootObject.get_index_of_address(utxo[1]['address'])
@@ -101,16 +100,12 @@ def sign_output_with_single_key(spending_tx,input_tx,input_index,privkey,script)
 
 def sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,script_list=None,hash160_preimage=None):
     input_tx_counter=0
-    print("SignTX")
-    print(privkey_list)
-    print(script_list)
     for utxo in taprootObject.utxoList:
         if(utxo[0].get()==1):
                 
             priv_key_index=input_tx_counter
             if(len(privkey_list)==1):
                 priv_key_index=0
-            print("Priv Index: "+str(priv_key_index)+"  "+str(input_tx_counter))
             if(script_list is None):#Spend via keypath
                 sighash = TaprootSignatureHash(spending_tx,
                                         input_tx.vout,
@@ -132,7 +127,6 @@ def sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,sc
                 spending_tx.wit.vtxinwit.append(CTxInWitness([signature]))
             else:
                 address_index=taprootObject.get_index_of_address(utxo[1]['address'])
-                print("Address Index "+str(address_index))
                 controlMap=taprootObject.control_map[address_index]
                 
                 if(hash160_preimage is None):
@@ -151,17 +145,12 @@ def sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,sc
 
 def signTX(taprootObject,privkey_list,spending_tx,input_tx,script_list=None,address_index_from_short_list=False):
     input_tx_counter=0
-    print("SignTX")
-    print(privkey_list)
-    print(script_list)
     for utxo in taprootObject.utxoList:
         if(utxo[0].get()==1):
                 
             if(address_index_from_short_list):address_index=input_tx_counter
             else: address_index=taprootObject.get_index_of_address(utxo[1]['address'])
-            print("Address Index "+str(address_index))
             priv_key_index=input_tx_counter
-            print("Privkey Index "+str(priv_key_index))
             if(len(privkey_list)==1):
                 priv_key_index=0
             if(script_list is None):#Spend via keypath
@@ -250,8 +239,6 @@ def signMultiSig(taprootObject,spending_tx,input_tx,cMultiSig,index,script=None,
     else: nonce_priv=cMultiSig.keys[index][2]
     sig=sign_musig(privkey,nonce_priv,cMultiSig.nonce_agg,cMultiSig.getTweakedPublicKey(),sighash)
                 
-    print("PubKey: "+str(privkey.get_pubkey())+" Nonce: "+str(nonce_priv.get_pubkey()))
-    print("Signature: "+str(sig))
     input_tx_counter+=1
                 
     signature_list.append(sig)
@@ -275,7 +262,6 @@ def address_to_scriptPubKey(address):
         if(version==0):
             if(len(program)==20 or len(program)==32):
                 script=program_to_witness_script(version,bytes(program)).hex()
-                #print("Segwit mainnet P2WPKH: ",script)
                 return script
             else:
                 global_.gl_console(text="Segwit Address has wrong length")
@@ -283,7 +269,6 @@ def address_to_scriptPubKey(address):
 
         if(version>0):
             script=program_to_witness_script(version,bytes(program)).hex()
-            #print("TapRoot mainnet P2WPKH: ",script)
             return script
 
     #Check if testnet bech32 or bech32m
@@ -296,7 +281,6 @@ def address_to_scriptPubKey(address):
         if(version==0):
             if(len(program)==20 or len(program)==32):
                 script=program_to_witness_script(version,bytes(program)).hex()
-                #print("Segwit testnet P2WPKH: ",script)
                 return script
             else:
                 global_.gl_console(text="Segwit Address has wrong length")
@@ -304,7 +288,6 @@ def address_to_scriptPubKey(address):
             
         if(version>0):
             script=program_to_witness_script(version,bytes(program)).hex()
-            #print("TapRoot testnet P2WPKH: ",script)
             return script
         
     #If it's not bech32/bech32m, check for P2PKH and P2SH
