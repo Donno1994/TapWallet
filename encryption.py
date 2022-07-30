@@ -219,7 +219,7 @@ def load_wallet():
                                                        ("all files",
                                                         "*.*")))
 	
-	if(len(wallt_file) ==0): return
+	if(len(wallt_file) ==0): wallt_file=None; return
 	passwd=askstring("Open wallet file","This file is encrypted. Enter password below",show="*")
 
 	
