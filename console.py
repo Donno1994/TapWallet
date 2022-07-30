@@ -4,7 +4,6 @@ import global_
 class Console:
 	def __init__(self):
 		self.root=global_.gl_gui.root
-		print(self.root)
 		self.textArea=tk.Text(self.root,font=('arial',11, 'italic'))
 		self.textArea.pack()
 		self.textArea.place(height=310,width=450, x=1015,y=52)

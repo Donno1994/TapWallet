@@ -10,7 +10,7 @@ def main():
 
     global_.gl_gui=window.class_gui()
 
-    global_.gl_console=console.Console()
+    
     global_.gl_gui.root.mainloop()
     
 

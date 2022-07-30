@@ -1,10 +1,11 @@
 
 gl_gui=None
 gl_gui_key=None
-gl_gui_address=None
+gl_gui_address_tab=None
 gl_gui_build_address=None
 gl_gui_service=None
 gl_gui_create_tx=None
+gl_gui_transaction_tab=None
 
 gl_selected_container=[]
 gl_taproot_list=[]
