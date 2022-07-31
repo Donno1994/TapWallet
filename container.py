@@ -791,14 +791,18 @@ class c_Container_Script(c_Container):
 	
 	def update_index(self):
 		if(len(self.tapLeaf)<2):return
-		txt="Script: "+str(shortenHexString(str(self.script[global_.gl_current_child_index].hex()),14,11))
 			
-		if(self.timelockDelay>0):txt=txt+"\nRelative Timelock: "+str(self.timelockDelay)
-		elif(self.timelock>0):txt=txt+"\nAbsolute Timelock: "+str(self.timelock)
-		else:txt=txt+"\nNo Timelock"
-		self.label_label1.config(text=txt)
-		self.label_label3.config(text="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),14,11)))
+		txt="Script: "+str(shortenHexString(str(self.script[global_.gl_current_child_index].hex()),14,11)+"\n")
+		
+		if(self.timelockDelay>0):txt=txt+"Rel Timelock: "+str(self.timelockDelay)
+		elif(self.timelock>0):txt=txt+"Abs Timelock: "+str(self.timelock)
 
+
+		if(self.hash160 is not None):
+			if(self.timelockDelay>0 or self.timelock>0):
+				txt+=" Hashlock: "+str(shortenHexString(self.hash160.hex(),3,3))
+			else:
+				txt+=" Hashlock: "+str(shortenHexString(self.hash160.hex(),14,11))
 
 
 class c_Container_Hash(c_Container):

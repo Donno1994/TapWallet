@@ -247,7 +247,7 @@ class gui_key_tab:
 		stringvar4 = tk.StringVar()
 		stringvar4.set("")
 
-		text_seed=tk.Label(self.page_new_seed,text="BIP 32 Seed: Create a new random seed, or enter your own 12 word seed");text_seed.pack();text_seed.place(x=5,y=40)
+		text_seed=tk.Label(self.page_new_seed,text="BIP 32 Seed: Create a new random seed, or enter your own 12 or 24 word seed");text_seed.pack();text_seed.place(x=5,y=40)
 		self.entry_seed = tk.Entry(self.page_new_seed,textvariable=stringvar,fg="black",bg="white",bd=0)
 		self.entry_seed.pack()
 		self.entry_seed.place(x=5,y=60,width=550,height=25)
@@ -785,6 +785,34 @@ class gui_build_address_canvas:
 		self.canvas.pack(fill=tk.BOTH, expand=1)
 		global_.gl_gui.root.bind('<KeyRelease>',self.check_key_released)
 
+		info_text=("Create a blue container by creating some public keys above. You can drag any container or select them with 'control.'\n"
+					"Double click a blue container to create a script. Select several blue containers with 'control' to create multisig.\n"
+					"Select two green (hash) containers two create a child hash.\n"
+					"Finally select one green container (merkle root) and one blue container (your primary spend key) to create a taproot address.")
+		self.info_instructions = tk.Label(self.container_Script, justify=tk.LEFT,text=info_text);
+		self.info_instructions.pack()
+		self.info_instructions.place(x=0,y=15)
+
+		self.button_hide_instructions=tk.Button(self.container_Script,text="Hide info",command=self.hide_instructions)
+		self.button_hide_instructions.pack()
+		self.button_hide_instructions.place(x=0,y=0,height=15)
+
+		self.button_show_instructions=tk.Button(self.container_Script,text="Show info",command=self.show_instructions)
+		self.button_show_instructions.pack()
+
+	def hide_instructions(self):
+		
+		self.info_instructions.place_forget()
+		self.button_hide_instructions.place_forget()
+		self.button_show_instructions.place(x=0,y=0,height=15)
+
+	def show_instructions(self):
+		
+		self.info_instructions.place(x=0,y=15)
+		self.button_hide_instructions.place(x=0,y=0,height=15)
+		self.button_show_instructions.place_forget()
+
+
 	def make_new(self):
 		self.taproot_container=None
 		self.editLabel=tk.StringVar() #label on second window 
@@ -983,7 +1011,7 @@ class gui_build_address_canvas:
 			# one pubkey and one hash are selected -> create Taproot
 			# All other combinations will be rejected
 
-			if hash_counter>2 or (hash_counter==2 and pubkey_counter>0) or (hash_counter>0 and pubkey_counter>1) or (hash_counter==1 and pubkey_counter!=1):
+			if hash_counter>2 or (hash_counter==2 and pubkey_counter>0) or (hash_counter>0 and pubkey_counter>1) or (hash_counter==1 and pubkey_counter!=1) or (pubkey_counter==1 and hash_counter==0):
 				global_.gl_console.printText(text="Choose one of the following methods:")
 				global_.gl_console.printText(text="- Flag multiple pub keys to create a multisig key",keepOld=True)
 				global_.gl_console.printText(text="- Flag two hashes to create a child hash",keepOld=True)
@@ -1014,7 +1042,7 @@ class gui_build_address_canvas:
 			self.editLabel.pack()
 			self.editLabel.place(height=15,width=150,x=160,y=5)
 
-			if (pubkey_counter==1 and hash_counter==1)or pubkey_counter==1:
+			if (pubkey_counter==1 and hash_counter==1):
 				self.scriptWindow.title("Create Taproot Address")
 				self.editLabel.destroy()
 				self.scriptWindow.geometry("400x120")
