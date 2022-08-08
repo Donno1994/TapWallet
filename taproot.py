@@ -61,8 +61,8 @@ def createUnsignedTX(taprootObject,destination_list,timeLockDelay=0,timeLock=0):
             input_tx_counter+=1
             txId=utxo[1]['txid']
             outputIndex=utxo[1]['output_n']
-            inputAmount=utxo[1]['value']/100000000
-
+            inputAmount=utxo[1]['value']
+            
             outpoint = COutPoint(int(txId, 16), outputIndex)
             nSequence=0
             if(timeLockDelay>0):nSequence=timeLockDelay
@@ -71,7 +71,7 @@ def createUnsignedTX(taprootObject,destination_list,timeLockDelay=0,timeLock=0):
             spending_tx.vin.append(spending_tx_in)
             
             address_index=taprootObject.get_index_of_address(utxo[1]['address'])
-            dest_input=CTxOut(nValue=int(inputAmount * 100_000_000),scriptPubKey=bytes.fromhex(address_to_scriptPubKey(taprootObject.TapRootAddress[address_index])))
+            dest_input=CTxOut(nValue=int(inputAmount),scriptPubKey=bytes.fromhex(address_to_scriptPubKey(taprootObject.TapRootAddress[address_index])))
             input_tx.vout.append(dest_input)
               
     if(input_tx_counter==0):
