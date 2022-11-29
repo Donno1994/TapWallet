@@ -43,12 +43,12 @@ class BitGoClient(BaseClient):
             url_path += '/' + cmd
         return self.request(url_path, variables, method=method)
 
-    def getbalance(self, addresslist):
-        balance = 0
-        for address in addresslist:
-            res = self.compose_request('address', address)
-            balance += res['balance']
-        return balance
+    # def getbalance(self, addresslist):
+    #     balance = 0
+    #     for address in addresslist:
+    #         res = self.compose_request('address', address)
+    #         balance += res['balance']
+    #     return balance
 
     def getutxos(self, address, after_txid='', limit=MAX_TRANSACTIONS):
         utxos = []
@@ -67,7 +67,7 @@ class BitGoClient(BaseClient):
                         'confirmations': utxo['confirmations'],
                         'output_n': utxo['tx_output_n'],
                         'input_n': 0,
-                        'block_height': utxo['blockHeight'],
+                        'block_height': int(utxo['blockHeight']) if utxo['blockHeight'] else None,
                         'fee': None,
                         'size': 0,
                         'value': int(round(utxo['value'] * self.units, 0)),
@@ -85,7 +85,7 @@ class BitGoClient(BaseClient):
     # RAW TRANSACTION DOES NOT CONTAIN CORRECT RAW TRANSACTION (MISSING SIGS)
     # def gettransaction(self, txid):
     #     tx = self.compose_request('tx', txid)
-    #     t = Transaction.parse_hex(tx['hex'], strict=False, network=self.network)
+    #     t = Transaction.parse_hex(tx['hex'], strict=self.strict, network=self.network)
     #     t.status = 'unconfirmed'
     #     t.date = None
     #     if tx['confirmations']:
@@ -153,7 +153,7 @@ class BitGoClient(BaseClient):
     # RAW TRANSACTION DOES NOT CONTAIN CORRECT RAW TRANSACTION (MISSING SIGS)
     # def getrawtransaction(self, txid):
     #     tx = self.compose_request('tx', txid)
-    #     t = Transaction.parse_hex(tx['hex'], strict=False, network=self.network)
+    #     t = Transaction.parse_hex(tx['hex'], strict=self.strict, network=self.network)
     #     for i in t.inputs:
     #         if not i.address:
     #             raise ClientError("Address missing in input. Provider might not support segwit transactions")

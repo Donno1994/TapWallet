@@ -39,6 +39,7 @@ if ENABLE_BITCOINLIB_LOGGING:
     handler.setLevel(LOGLEVEL)
     logger.addHandler(handler)
 
+
     _logger = logging.getLogger(__name__)
     logger.info('WELCOME TO BITCOINLIB - CRYPTOCURRENCY LIBRARY')
     logger.info('Version: %s' % BITCOINLIB_VERSION)
@@ -107,12 +108,12 @@ def get_encoding_from_witness(witness_type=None):
 
 def deprecated(func):
     """
-    This is a decorator which can be used to mark functions as deprecated. It will result in a warning being emitted
-    when the function is used.
+    This is a decorator which can be used to mark functions as deprecated. It will result in a warning being emitted when the function is used.
     """
 
     @functools.wraps(func)
     def new_func(*args, **kwargs):
         logging.warning("Call to deprecated function {}.".format(func.__name__))
         return func(*args, **kwargs)
+    
     return new_func

@@ -82,8 +82,12 @@ def _get_script_types(blueprint):
             bp[-1] = 'signature'
         else:
             bp.append(item)
-    bp_len = [int(c.split('-')[1]) for c in blueprint if isinstance(c, str) and c[:4] == 'data']
 
+    script_types = [key for key, values in SCRIPT_TYPES.items() if values[1] == bp]
+    if script_types:
+        return script_types
+
+    bp_len = [int(c.split('-')[1]) for c in blueprint if isinstance(c, str) and c[:4] == 'data']
     script_types = []
     while len(bp):
         # Find all possible matches with blueprint
@@ -327,8 +331,15 @@ class Script(object):
                 data_length = int.from_bytes(script.read(2), 'little')
             if data_length:
                 data = script.read(data_length)
+
                 if len(data) != data_length:
+                    
                     msg = "Malformed script, not enough data found"
+                    print(msg)
+                    print(data)
+                    a.a.a()
+
+
                     if strict:
                         raise ScriptError(msg)
                     else:
@@ -338,10 +349,16 @@ class Script(object):
                 data_type = get_data_type(data)
                 commands.append(data)
                 if data_type == 'signature':
-                    sig = Signature.parse_bytes(data)
-                    signatures.append(sig)
-                    hash_type = sig.hash_type
-                    blueprint.append('signature')
+                    try:
+                        sig = Signature.parse_bytes(data)
+                        signatures.append(sig)
+                        hash_type = sig.hash_type
+                        blueprint.append('signature')
+                    except Exception as e:
+                        if strict:
+                            raise ScriptError(str(e))
+                        else:
+                            _logger.warning(str(e))
                 elif data_type == 'signature_object':
                     signatures.append(data)
                     hash_type = data.hash_type
@@ -363,7 +380,7 @@ class Script(object):
                         if _level >= 1:
                             blueprint.append('data-%d' % len(data))
                         else:
-                            s2 = Script.parse_bytes(data, _level=_level+1)
+                            s2 = Script.parse_bytes(data, _level=_level+1, strict=strict)
                             commands.pop()
                             commands += s2.commands
                             blueprint += s2.blueprint

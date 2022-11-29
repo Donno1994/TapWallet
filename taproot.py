@@ -7,7 +7,7 @@ from bitcoin_core_framework.segwit_addr import *
 from bitcoin_core_framework.script import *
 from bitcoinlib.services.services import *
 from helperFunctions import *
-import global_
+import config
 import console
 
 TAPSCRIPT_VER = bytes([0xc0])
@@ -81,7 +81,7 @@ def createUnsignedTX(taprootObject,destination_list,timeLockDelay=0,timeLock=0):
     spending_tx.vout = []
     for destination in destination_list:
         scriptpubkey = bytes.fromhex(address_to_scriptPubKey(destination[0]))
-        amount_sat = int(destination[1] * 100_000_000)
+        amount_sat = int(destination[1])
         dest_output = CTxOut(nValue=amount_sat, scriptPubKey=scriptpubkey)
         spending_tx.vout.append(dest_output)
 
@@ -100,6 +100,7 @@ def sign_output_with_single_key(spending_tx,input_tx,input_index,privkey,script)
 
 def sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,script_list=None,hash160_preimage=None):
     input_tx_counter=0
+    sign=None
     for utxo in taprootObject.utxoList:
         if(utxo[0].get()==1):
                 
@@ -188,7 +189,6 @@ def signTX(taprootObject,privkey_list,spending_tx,input_tx,script_list=None,addr
 def SpendTransactionViaKeyPath(taprootObject,privkey_list,destination_list,change_amount=0,address_index_from_short_list=False):
 
     spending_tx,input_tx=createUnsignedTX(taprootObject,destination_list)
-#signedTX=signTX(taprootObject,taprootObject.tweaked_privkey,spending_tx,input_tx,None,address_index_from_short_list)
     signedTX=sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx)
 
     return signedTX
@@ -254,8 +254,8 @@ def address_to_scriptPubKey(address):
         
     #Check if mainnet bech32 or bech32m
     if(address[0:3]=='bc1' or address[0:3]=='BC1'):
-        if(global_.gl_mainnet==False):
-            global_.gl_console(text="This is a mainnet address. You are using testnet.")
+        if(config.gl_mainnet==False):
+            config.gl_console(text="This is a mainnet address. You are using testnet.")
             return None
         version,program=decode_segwit_address("bc", address)
         if(version is None):return None
@@ -264,7 +264,7 @@ def address_to_scriptPubKey(address):
                 script=program_to_witness_script(version,bytes(program)).hex()
                 return script
             else:
-                global_.gl_console(text="Segwit Address has wrong length")
+                config.gl_console(text="Segwit Address has wrong length")
                 return None
 
         if(version>0):
@@ -273,8 +273,8 @@ def address_to_scriptPubKey(address):
 
     #Check if testnet bech32 or bech32m
     if(address[0:3]=='tb1' or address[0:3]=='TB1'):
-        if(global_.gl_mainnet==True):
-            global_.gl_console(text="This is a testnet address. You are using mainnet.")
+        if(config.gl_mainnet==True):
+            config.gl_console(text="This is a testnet address. You are using mainnet.")
             return None
         version,program=decode_segwit_address("tb", address)
         if(version is None):return None
@@ -283,7 +283,7 @@ def address_to_scriptPubKey(address):
                 script=program_to_witness_script(version,bytes(program)).hex()
                 return script
             else:
-                global_.gl_console(text="Segwit Address has wrong length")
+                config.gl_console(text="Segwit Address has wrong length")
                 return None
             
         if(version>0):
@@ -296,36 +296,36 @@ def address_to_scriptPubKey(address):
 
     if(version is None):return None
     if(version==0):#mainnet P2PKH
-        if(global_.gl_mainnet==False):
-            global_.gl_console(text="This is a mainnet address. You are using testnet.")
+        if(config.gl_mainnet==False):
+            config.gl_console(text="This is a mainnet address. You are using testnet.")
             return None
         script=keyhash_to_p2pkh_script(result).hex()
         #print("P2PKH: ",script)
         return script
     if(version==5):#main P2SH
-        if(global_.gl_mainnet==False):
-            global_.gl_console(text="This is a mainnet address. You are using testnet.")
+        if(config.gl_mainnet==False):
+            config.gl_console(text="This is a mainnet address. You are using testnet.")
             return None
         script=scripthash_to_p2sh_script(result).hex()
         #print("P2SH: ",script)
         return script
 
     if(version==111):#testnet P2PKH
-        if(global_.gl_mainnet==True):
-            global_.gl_console(text="This is a testnet address. You are using mainnet.")
+        if(config.gl_mainnet==True):
+            config.gl_console(text="This is a testnet address. You are using mainnet.")
             return None
         script=keyhash_to_p2pkh_script(result).hex()
         #print("P2PKH: ",script)
         return script
     if(version==196):#testnet P2SH
-        if(global_.gl_mainnet==True):
-            global_.gl_console(text="This is a testnet address. You are using mainnet.")
+        if(config.gl_mainnet==True):
+            config.gl_console(text="This is a testnet address. You are using mainnet.")
             return None
         script=scripthash_to_p2sh_script(result).hex()
         #print("P2SH: ",script)
         return script
         
-    global_.gl_console(text="Can't decode address properly'")
+    config.gl_console(text="Can't decode address properly'")
 
     return None
 
@@ -369,7 +369,7 @@ def get_timelock_bytes_for_script(timeLock):
     timelock_bytes.append(0x75)#OP_DROP
     if(timelock_bytes[-3]>=0x80):
         print("ERROR in TapTreeClass: getTimelockBytesForScript - signed integer would be negative")
-        global_.gl_console(text="ERROR in TapTreeClass: getTimelockBytesForScript - signed integer would be negative")
+        config.gl_console(text="ERROR in TapTreeClass: getTimelockBytesForScript - signed integer would be negative")
         return None
 
     return timelock_bytes

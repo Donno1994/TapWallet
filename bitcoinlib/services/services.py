@@ -42,6 +42,7 @@ class ServiceError(Exception):
     def __str__(self):
         return self.msg
 
+connected=True
 
 class Service(object):
     """
@@ -50,14 +51,15 @@ class Service(object):
 
     The Service class connects to 1 or more service providers at random to retrieve or send information. If a service
     providers fails to correctly respond the Service class will try another available provider.
-
+    
     """
+    
 
     def __init__(self, network=DEFAULT_NETWORK, min_providers=1, max_providers=1, providers=None,
                  timeout=TIMEOUT_REQUESTS, cache_uri=None, ignore_priority=False, exclude_providers=None,
-                 max_errors=SERVICE_MAX_ERRORS):
+                 max_errors=SERVICE_MAX_ERRORS, strict=True):
         """
-        Create a service object for the specified network. By default the object connect to 1 service provider, but you
+        Create a service object for the specified network. By default, the object connect to 1 service provider, but you
         can specify a list of providers or a minimum or maximum number of providers.
 
         :param network: Specify network used
@@ -76,6 +78,8 @@ class Service(object):
         :type ignore_priority: bool
         :param exclude_providers: Exclude providers in this list, can be used when problems with certain providers arise.
         :type exclude_providers: list of str
+        :param strict: Strict checks of valid signatures, scripts and transactions. Normally use strict=True for wallets, transaction validations etcetera. For blockchain parsing strict=False should be used, but be sure to check warnings in the log file. Default is True.
+        :type strict: bool
 
         """
 
@@ -136,6 +140,7 @@ class Service(object):
             _logger.warning("Could not connect to cache database. Error: %s" % e)
         self.results_cache_n = 0
         self.ignore_priority = ignore_priority
+        self.strict = strict
         if self.min_providers > 1:
             self._blockcount = Service(network=network, cache_uri=cache_uri).blockcount()
         else:
@@ -154,6 +159,10 @@ class Service(object):
         self.resultcount = 0
 
     def _provider_execute(self, method, *arguments):
+        #BR_Robin
+        global connected
+        at_least_one_connection=False
+
         self._reset_results()
         provider_lst = [p[0] for p in sorted([(x, self.providers[x]['priority']) for x in self.providers],
                         key=lambda x: (x[1], random.random()), reverse=True)]
@@ -172,11 +181,19 @@ class Service(object):
                 pc_instance = providerclient(
                     self.network, self.providers[sp]['url'], self.providers[sp]['denominator'],
                     self.providers[sp]['api_key'], self.providers[sp]['provider_coin_id'],
-                    self.providers[sp]['network_overrides'], self.timeout, self._blockcount)
+                    self.providers[sp]['network_overrides'], self.timeout, self._blockcount, self.strict)
                 if not hasattr(pc_instance, method):
                     continue
+                if self.providers[sp]['api_key'] == 'api-key-needed':
+                    continue
+                print("Send request to ",sp,"  ",method," ",*arguments)
                 providermethod = getattr(pc_instance, method)
                 res = providermethod(*arguments)
+                print("Response: ",sp,"  ",res)
+                #BR_Robin
+                connected=True
+                at_least_one_connection=True
+
                 if res is False:  # pragma: no cover
                     self.errors.update(
                         {sp: 'Received empty response'}
@@ -189,6 +206,7 @@ class Service(object):
                 _logger.debug("Executed method %s from provider %s" % (method, sp))
                 self.resultcount += 1
             except Exception as e:
+                connected=at_least_one_connection
                 if not isinstance(e, AttributeError):
                     try:
                         err = e.msg
@@ -203,9 +221,12 @@ class Service(object):
                     # pprint(self.errors)
 
                 if len(self.errors) >= self.max_errors:
-                    _logger.warning("No successful response from serviceproviders, max errors exceeded: %s" %
+                    _logger.warning("Aborting, max errors exceeded: %s" %
                                     list(self.errors.keys()))
-                    return False
+                    if len(self.results):
+                        return list(self.results.values())[0]
+                    else:
+                        return False
 
             if self.resultcount >= self.max_providers:
                 break
@@ -272,6 +293,8 @@ class Service(object):
             self.results_cache_n = len(utxos_cache)
 
             if db_addr and db_addr.last_block and db_addr.last_block >= self.blockcount():
+                #print("UTXOS CACHE   ",address)
+                #for utxo in utxos_cache:print(utxo)
                 return utxos_cache
             else:
                 utxos_cache = []
@@ -281,8 +304,7 @@ class Service(object):
 
         utxos = self._provider_execute('getutxos', address, after_txid, limit)
         if utxos is False:
-            self.complete = False
-            return utxos_cache
+            raise ServiceError("Error when retrieving UTXO's")
         else:
             # TODO: Update cache_transactions_node
             if utxos and len(utxos) >= limit:
@@ -291,11 +313,15 @@ class Service(object):
                 balance = sum(u['value'] for u in utxos)
                 self.cache.store_address(address, balance=balance, n_utxos=len(utxos))
 
+        #print("UTXOS CACHE   ",address)
+        # utxo in utxos_cache:print(utxo)
+        #print("UTXOS Service ",address)
+        #for utxo in utxos:print(utxo)
         return utxos_cache + utxos
 
     def gettransaction(self, txid):
         """
-        Get a transaction by its transaction hashtxos. Convert to Bitcoinlib transaction object.
+        Get a transaction by its transaction hash. Convert to Bitcoinlib Transaction object.
 
         :param txid: Transaction identification hash
         :type txid: str
@@ -311,11 +337,14 @@ class Service(object):
                 self.results_cache_n = 1
         if not tx:
             tx = self._provider_execute('gettransaction', txid)
+            if tx and tx.txid != txid:
+                _logger.warning("Incorrect txid after parsing")
+                tx.txid = txid
             if len(self.results) and self.min_providers <= 1:
                 self.cache.store_transaction(tx)
         return tx
 
-    def gettransactions(self, address, after_txid='', limit=MAX_TRANSACTIONS):
+    def gettransactions(self, address, after_txid='', limit=MAX_TRANSACTIONS,force_fetch=False):
         """
         Get all transactions for specified address.
 
@@ -330,6 +359,7 @@ class Service(object):
 
         :return list: List of Transaction objects
         """
+        limit=50
         self._reset_results()
         self.results_cache_n = 0
         if not address:
@@ -349,6 +379,7 @@ class Service(object):
 
         if caching_enabled:
             txs_cache = self.cache.gettransactions(address, qry_after_txid, limit) or []
+            #print("get tx from cache ",txs_cache)
             if txs_cache:
                 self.results_cache_n = len(txs_cache)
                 if len(txs_cache) == limit:
@@ -358,16 +389,16 @@ class Service(object):
 
         # Get (extra) transactions from service providers
         txs = []
-        if not(db_addr and db_addr.last_block and db_addr.last_block >= self.blockcount()) or not caching_enabled:
-            txs = self._provider_execute('gettransactions', address, qry_after_txid.hex(),  limit)
-            if txs is False:
-                raise ServiceError("Error when retrieving transactions from service provider")
+        #if not(db_addr and db_addr.last_block and db_addr.last_block >= self.blockcount()) or not caching_enabled or force_fetch:
+        txs = self._provider_execute('gettransactions', address, qry_after_txid.hex(),  limit)
+        if txs is False:
+            raise ServiceError("Error when retrieving transactions from service provider")
 
         # Store transactions and address in cache
         # - disable cache if comparing providers or if after_txid is used and no cache is available
         last_block = None
         last_txid = None
-        if self.min_providers <= 1 and not(after_txid and not db_addr) and caching_enabled:
+        if self.min_providers <= 1 and not(after_txid and not db_addr) and caching_enabled or force_fetch:
             last_block = self.blockcount()
             last_txid = qry_after_txid
             self.complete = True
@@ -390,10 +421,27 @@ class Service(object):
                 self.cache.commit()
                 self.cache.store_address(address, last_block, last_txid=last_txid, txs_complete=self.complete)
 
-        all_txs = txs_cache + txs
+        
+        
+        all_txs=txs_cache
+        for tx in txs:
+            already_in_cache=False
+            for tx_cache in txs_cache:
+                #print("Cache ",txs_cache)
+                #print("Service",tx)
+                if(tx_cache==tx):
+                    print("ERROR: Service and Cache have same tx")
+                    already_in_cache=True
+            if(not already_in_cache):
+                all_txs.append(tx)
+        
+        #print("FROM ALL ")
+        #for tx in all_txs:print(tx)
+        #print("Complete? ",self.complete)
         # If we have txs for this address update spent and balance information in cache
         if self.complete:
             all_txs = transaction_update_spents(all_txs, address)
+            #for tx in all_txs:print(tx)
             if caching_enabled:
                 self.cache.store_address(address, last_block, last_txid=last_txid, txs_complete=True)
                 for t in all_txs:
@@ -428,17 +476,24 @@ class Service(object):
         """
         return self._provider_execute('sendrawtransaction', rawtx)
 
-    def estimatefee(self, blocks=3):
+    def estimatefee(self, blocks=3, priority=''):
         """
         Estimate fee per kilobyte for a transaction for this network with expected confirmation within a certain
         amount of blocks
 
-        :param blocks: Expection confirmation time in blocks. Default is 3.
+        :param blocks: Expected confirmation time in blocks. Default is 3.
         :type blocks: int
+        :param priority: Priority for transaction: can be 'low', 'medium' or 'high'. Overwrites value supplied in 'blocks' argument
+        :type priority: str
 
-        :return int: Fee in smallest network denominator (satoshi)
+        :return int: Fee in the smallest network denominator (satoshi)
         """
         self.results_cache_n = 0
+        if priority:
+            if priority == 'low':
+                blocks = 10
+            elif priority == 'high':
+                blocks = 1
         if self.min_providers <= 1:  # Disable cache if comparing providers
             fee = self.cache.estimatefee(blocks)
             if fee:
@@ -450,10 +505,14 @@ class Service(object):
                 fee = self.network.fee_default
             else:
                 raise ServiceError("Could not estimate fees, please define default fees in network settings")
+        if fee < self.network.fee_min:
+            fee = self.network.fee_min
+        elif fee > self.network.fee_max:
+            fee = self.network.fee_max
         self.cache.store_estimated_fee(blocks, fee)
         return fee
 
-    def blockcount(self):
+    def blockcount(self,force_fetch=False):
         """
         Get latest block number: The block number of last block in longest chain on the Blockchain.
 
@@ -462,11 +521,12 @@ class Service(object):
         :return int:
         """
 
+        # Force fetch implemented by BR_Robin. Don't fetch cached blockcount and fetch from service
         blockcount = self.cache.blockcount()
         last_cache_blockcount = self.cache.blockcount(never_expires=True)
         if blockcount:
             self._blockcount = blockcount
-            return blockcount
+            if(force_fetch==False):return blockcount
 
         current_timestamp = time.time()
         if self._blockcount_update < current_timestamp - BLOCK_COUNT_CACHE_TIME:
@@ -705,22 +765,10 @@ class Cache(object):
                         block_height=db_tx.block_height, status='confirmed', witness_type=db_tx.witness_type.value)
         for n in db_tx.nodes:
             if n.is_input:
-                witnesses = []
-                # TODO: Move code to Script class
-                if n.witnesses:
-                    witness_str = n.witnesses
-                    n_items, cursor = varbyteint_to_int(witness_str[0:9])
-                    for m in range(0, n_items):
-                        witness = b'\0'
-                        item_size, size = varbyteint_to_int(witness_str[cursor:cursor + 9])
-                        if item_size:
-                            witness = witness_str[cursor + size:cursor + item_size + size]
-                        cursor += item_size + size
-                        witnesses.append(witness)
                 if n.ref_txid == b'\00' * 32:
                     t.coinbase = True
                 t.add_input(n.ref_txid.hex(), n.ref_index_n, unlocking_script=n.script, address=n.address,
-                            sequence=n.sequence, value=n.value, index_n=n.index_n, witnesses=witnesses, strict=False)
+                            sequence=n.sequence, value=n.value, index_n=n.index_n, witnesses=n.witnesses, strict=False)
             else:
                 t.add_output(n.value, n.address, lock_script=n.script, spent=n.spent, output_n=n.index_n,
                              spending_txid=None if not n.ref_txid else n.ref_txid.hex(),
@@ -805,6 +853,7 @@ class Cache(object):
                     filter(DbCacheTransactionNode.address == address). \
                     order_by(DbCacheTransaction.block_height, DbCacheTransaction.order_n).all()
             for db_tx in db_txs:
+                #print("DB TX, ",db_tx)
                 t = self._parse_db_transaction(db_tx)
                 if t:
                     if t.block_height:
@@ -1000,6 +1049,14 @@ class Cache(object):
 
         :return:
         """
+        #print("INPUTS ",t)
+        #for input_ in t.inputs:
+            #print(input_.as_dict())
+
+        #print("OUTPUTS ",t)
+        #for input_ in t.outputs:
+            #print(input_.as_dict())
+
         if not self.cache_enabled():
             return
         # Only store complete and confirmed transaction in cache
@@ -1007,6 +1064,7 @@ class Cache(object):
             _logger.info("Caching failure tx: Missing transaction hash")
             return False
         elif not t.date or not t.block_height or not t.network:
+            #print("No Blockheight ",t)
             _logger.info("Caching failure tx: Incomplete transaction missing date, block height or network info")
             return False
         elif not t.coinbase and [i for i in t.inputs if not i.value]:

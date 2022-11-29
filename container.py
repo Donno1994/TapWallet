@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
-import global_ 
+import config 
 import bitcoinlib
 from bitcoin_core_framework.script import hash160,hash256,sha256,ripemd160
 
@@ -38,7 +38,7 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 		self.active=True
 		self.is_mine=is_mine
 
-		self.root=global_.gl_gui_build_address.container_Script
+		self.root=config.gl_gui_build_address.container_Script
 		self.mouseDown=False
 		self.mouseX=x_pos
 		self.mouseY=y_pos
@@ -47,7 +47,7 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 
 		self.has_extended_parent=has_extended_parent # True, if at least one parent is an extended key. Then this key can't be calculated until a child key is derived
 
-		global_.gl_gui.bool_ask_for_save=True
+		#config.gl_gui.bool_ask_for_save=True
 		
 
 		self.container = tk.LabelFrame(self.root)
@@ -97,7 +97,7 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 			for i in range(0, len(parent_array)):
 				middleX=self.x_pos+(self.sizeX/2)
 				middleY=self.y_pos+(self.sizeY/2)
-				self.line.append(global_.gl_gui_build_address.canvas.create_line(middleX,middleY,parent_array[i].x_pos+(self.sizeX/2),parent_array[i].y_pos++(self.sizeY/2)))
+				self.line.append(config.gl_gui_build_address.canvas.create_line(middleX,middleY,parent_array[i].x_pos+(self.sizeX/2),parent_array[i].y_pos++(self.sizeY/2)))
 
 		self.buttonMinimize=tk.Button(self.container,bg="#FF8080", text="-", command=self.minimizeContainer)
 		self.buttonMinimize.pack()
@@ -154,7 +154,7 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 			middleY=self.y_pos+(self.sizeY/2)
 
 			for i in range (0,len(self.parent_array)):
-				global_.gl_gui_build_address.canvas.coords(self.line[i],middleX,middleY,self.parent_array[i].x_pos+(self.sizeX/2),self.parent_array[i].y_pos+(self.sizeY/2))
+				config.gl_gui_build_address.canvas.coords(self.line[i],middleX,middleY,self.parent_array[i].x_pos+(self.sizeX/2),self.parent_array[i].y_pos+(self.sizeY/2))
 
 	def changeColor(self):
 
@@ -194,10 +194,10 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 	def flag(self,event):
 		
 		
-		for i in range(0,len(global_.gl_selected_container)):
-			if(global_.gl_selected_container[i]==self):
+		for i in range(0,len(config.gl_selected_container)):
+			if(config.gl_selected_container[i]==self):
 				self.changeColor()
-				global_.gl_selected_container.remove(self)
+				config.gl_selected_container.remove(self)
 				return
 
 		#if(gui.taproot_container==None):#Don't flag when Taproot Address exists
@@ -206,7 +206,7 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 		self.label_label0.config(bg="#ffcc00")
 		self.label_label1.config(bg="#ffcc00")
 		if(isinstance(self,c_Container_Script)):self.label_label3.config(bg="#ffcc00")
-		global_.gl_selected_container.append(self)
+		config.gl_selected_container.append(self)
 
 	def minimizeContainer(self):
 		if(self.isMini):
@@ -232,6 +232,9 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 				self.highlightContainer.config(text=str(self.label0))
 
 		self.container.place(height=self.sizeY,width=self.sizeX, x=self.x_pos,y=self.y_pos)
+		self.updateLine()
+		for i in range (0,len(self.childList)):
+			self.childList[i].updateLine()
 
 	def remove_container(self,ask_for_confirmation=True):
 		
@@ -244,17 +247,17 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 			if(answer==False):
 				return
 		for i in range(0,len(self.parent_array)):
-			global_.gl_gui_build_address.canvas.delete(self.line[i])
+			config.gl_gui_build_address.canvas.delete(self.line[i])
 
 		for i in range(0,len(self.childList)):
 			self.childList[i].remove_container(False)
 
-		for i in range(0,len(global_.gl_selected_container)):
-			if(global_.gl_selected_container[i]==self):
-				global_.gl_selected_container.remove(self)
+		for i in range(0,len(config.gl_selected_container)):
+			if(config.gl_selected_container[i]==self):
+				config.gl_selected_container.remove(self)
 
-		global_.gl_gui_build_address.removeKeyContainer(self)
-		global_.gl_gui.bool_ask_for_save=True
+		config.gl_gui_build_address.removeKeyContainer(self)
+		config.gl_gui.bool_ask_for_save=True
 		self.container.destroy()
 
 	def updateLine(self):
@@ -272,7 +275,7 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 		middleY=tempY+(self.sizeY/2)
 
 		for i in range(0,len(self.parent_array)):
-			global_.gl_gui_build_address.canvas.coords(self.line[i],middleX,middleY,self.parent_array[i].x_pos+(self.parent_array[i].sizeX/2),self.parent_array[i].y_pos+(self.parent_array[i].sizeY/2))
+			config.gl_gui_build_address.canvas.coords(self.line[i],middleX,middleY,self.parent_array[i].x_pos+(self.parent_array[i].sizeX/2),self.parent_array[i].y_pos+(self.parent_array[i].sizeY/2))
 	
 	def doubleClick(self,event):
 		return
@@ -284,25 +287,25 @@ class c_Container: #Moveable Parent Container, can be a public key, script, hash
 			container.setParentActive()
 
 	def copy_on_right_click(self,event):
-		index=global_.gl_current_child_index
+		index=config.gl_current_child_index
 
 		if(isinstance(self,c_Container_PubKey)):
 			if(len(self.pubkey)==1):index=0
-			global_.gl_console.copyText(str(self.pubkey[index]))
+			config.gl_console.copyText(str(self.pubkey[index]))
 		if(isinstance(self,c_Container_Script)):
 			if(len(self.script)==1):index=0
-			global_.gl_console.copyText(str(self.script[index].hex()))
+			config.gl_console.copyText(str(self.script[index].hex()))
 		if(isinstance(self,c_Container_Hash)):
 			if(len(self.hash_)==1):index=0
-			global_.gl_console.copyText(self.hash_[index].hex())
+			config.gl_console.copyText(self.hash_[index].hex())
 		if(isinstance(self,c_Container_Taproot)):
 			if(len(self.TapRootAddress)==1):index=0
-			global_.gl_console.copyText(self.TapRootAddress[index])
+			config.gl_console.copyText(self.TapRootAddress[index])
 
 	def copy_hash_on_right_click(self,event):
-		index=global_.gl_current_child_index
+		index=config.gl_current_child_index
 		if(len(self.hash_)==1):index=0
-		global_.gl_console.copyText(self.hash_[index].hex())
+		config.gl_console.copyText(self.hash_[index].hex())
 		
 
 class c_Container_PubKey (c_Container):
@@ -312,7 +315,7 @@ class c_Container_PubKey (c_Container):
 		self.ext_key=ext_key
 		self.privkey=privKey
 		self.pubkey=pubKey
-		
+
 		if(self.ext_key is not None):
 			if(is_mine is None):is_mine=self.ext_key.secret
 			label1=self.ext_key.wif_public()
@@ -364,17 +367,26 @@ class c_Container_PubKey (c_Container):
 			if(len(str(privKey))>5):
 				print("Addig KeyPair: ",str(privKey)," - ",str(privKey.wif_public()))
 
+		
 		if(self.ext_key is not None):
-			for i in range (0,global_.gl_address_generation_max):
-				if(self.ext_key.secret is not None):
-					prv=test_framework.ECKey().set(self.ext_key.child_private(0).child_private(i).secret)
-				else:prv=None
-				pub=test_framework.ECPubKey().set(self.ext_key.child_public(0).child_public(i).public_byte)
-				if(pub.get_y()%2!=0):
-					if(prv is not None):prv.negate()
-					pub.negate()
-				if(prv is not None):self.privkey.append(prv)
-				self.pubkey.append(pub)
+			
+			for change_index in range(2):
+
+				priv_parent = self.ext_key.child_private(change_index) if(self.ext_key.secret is not None) else None
+				pub_parent = self.ext_key.child_public(change_index)
+
+				for address_index in range (0,int(config.gl_address_generation_max/2)):
+					print("Address Index ",address_index ,"")
+					if(self.ext_key.secret is not None):
+						prv=test_framework.ECKey().set(priv_parent.child_private(address_index).secret)
+					else:prv=None
+					pub=test_framework.ECPubKey().set(pub_parent.child_public(address_index).public_byte)
+					if(pub.get_y()%2!=0):
+						if(prv is not None):prv.negate()
+						pub.negate()
+					if(prv is not None):self.privkey.append(prv)
+					self.pubkey.append(pub)
+
 
 		self.update_index()
 
@@ -399,7 +411,7 @@ class c_Container_PubKey (c_Container):
 		e.place(x=5,y=25,width=590)
 
 		data_string_pub = tk.StringVar()
-		if(len(self.pubkey)> global_.gl_current_child_index):data_string_pub.set("Public Key "+str(global_.gl_current_child_index)+": "+str(self.pubkey[global_.gl_current_child_index]))
+		if(len(self.pubkey)> config.gl_current_child_index):data_string_pub.set("Public Key "+str(config.gl_current_child_index)+": "+str(self.pubkey[config.gl_current_child_index]))
 		else: data_string_pub.set(str("Public Key  : not available"))
 		e2=tk.Entry(self.scriptWindow,textvariable=data_string_pub,fg="black",bg="white",bd=0,state="readonly")
 		e2.pack()
@@ -407,7 +419,7 @@ class c_Container_PubKey (c_Container):
 
 		scriptFrame = tk.LabelFrame(self.scriptWindow)
 		scriptFrame.pack()
-		scriptFrame.place(height=265,width=590, x=5,y=70)
+		scriptFrame.place(height=280,width=590, x=5,y=70)
 
 		label=tk.Label(scriptFrame,text="Create a script of the above key to specify spending conditions")
 		label.pack()
@@ -487,39 +499,55 @@ class c_Container_PubKey (c_Container):
 
 		self.editHashlock=tk.Entry(scriptFrame)
 		self.editHashlock.pack()
-		self.editHashlock.place(height=15,width=300,x=150,y=185)
+		self.editHashlock.place(height=15,width=450,x=100,y=185)
 		self.editHashlock.bind("<KeyRelease>", self.calc_hashlock)
 
 		self.label_hash_value=tk.Label(scriptFrame,text="Hash160 Value:")
 		self.label_hash_value.pack()
 		self.label_hash_value.place(height=15,x=5,y=210)
 
-		self.edit_show_hash160=tk.Entry(scriptFrame,state='disabled')
+		self.typed_hash = tk.StringVar()
+		self.edit_show_hash160=tk.Entry(scriptFrame,textvariable=self.typed_hash)
 		self.edit_show_hash160.pack()
-		self.edit_show_hash160.place(height=15,width=300,x=150,y=210)
+		self.edit_show_hash160.place(height=15,width=300,x=100,y=210)
+		self.edit_show_hash160.bind("<KeyRelease>", self.use_custom_hashlock);
 
+		self.label_hash_info=tk.Label(scriptFrame,text="Enter a preimage, generate a random preimage, or enter a friend's hash")
+		self.label_hash_info.pack()
+		self.label_hash_info.place(height=15,x=100,y=235)
+
+		self.button_random_preimage=tk.Button(scriptFrame,text="Create random Preimage", command=self.create_random_preimage,bg="#ffcc80")
+		self.button_random_preimage.pack()
+		self.button_random_preimage.place(height=15,x=510,y=185)
 		
 
 		self.buttonScript=tk.Button(scriptFrame,text="Create Script", command=self.createScript,bg="#DC7A7A")
 		self.buttonScript.pack()
-		self.buttonScript.place(height=20,width=100,x=5,y=235)
+		self.buttonScript.place(height=20,width=90,x=5,y=250)
 
 		self.showNoHashlock()
 
 		taprootFrame = tk.LabelFrame(self.scriptWindow)
 		taprootFrame.pack()
-		taprootFrame.place(height=60,width=590, x=5,y=340)
+		taprootFrame.place(height=40,width=600, x=5,y=350)
 
-		buttonTaprootAddress=tk.Button(taprootFrame,text="Create Taproot", command=lambda:global_.gl_gui_build_address.calc_key_released_taproot(key=self),bg="#47C718")
+		buttonTaprootAddress=tk.Button(taprootFrame,text="Create Taproot", command=lambda:config.gl_gui_build_address.calc_key_released_taproot(key=self),bg="#47C718")
 		buttonTaprootAddress.pack()
-		buttonTaprootAddress.place(height=20,width=100,x=5,y=20)
+		buttonTaprootAddress.place(height=20,width=90,x=5,y=5)
 
-		labelInfo=tk.Label(taprootFrame,text="Creating a taproot address from this key\nwill delete all other scripts and keys\napart from parent keys")
+		labelInfo=tk.Label(taprootFrame,text="If you don't want to use scripts, you can create a taproot address straight away.\n"
+											"This will delete all other scripts and keys apart from parent keys.")
 		labelInfo.pack()
 		labelInfo.place(x=120,y=5)
 
 		
+	def create_random_preimage(self):
+		prv,pub=test_framework.generate_bip340_key_pair()
+		prv=str(hex(prv.secret))[2:]
 
+		self.editHashlock.delete(0, 'end')
+		self.editHashlock.insert(0,prv)
+		self.calc_hashlock()
 	
 	def showNoTimelock(self):
 		self.containerAbsTimelock.place_forget()
@@ -541,56 +569,85 @@ class c_Container_PubKey (c_Container):
 	def showNoHashlock(self):
 		self.label_preimage_value.place_forget()
 		self.editHashlock.place_forget()
+		self.button_random_preimage.place_forget()
 		self.label_hash_value.place_forget()
 		self.edit_show_hash160.place_forget()
+		self.label_hash_info.place_forget()
 
 		self.editHashlock.delete(0, 'end')
 		self.edit_show_hash160.configure(state='normal',fg="#000000")
 		self.edit_show_hash160.delete(0, 'end')
-		self.edit_show_hash160.insert(0,"Enter a password above")
-		self.edit_show_hash160.configure(state='disabled')
+
+
 		self.buttonScript.configure(state='normal')
 
 		self.hash160=None
 
 	def showHashlock(self):
 		self.label_preimage_value.place(height=15,x=5,y=185)
-		self.editHashlock.place(height=15,width=300,x=150,y=185)
+		self.editHashlock.place(height=15,width=400,x=100,y=185)
+		self.button_random_preimage.place(height=15,x=420,y=210)
 		self.label_hash_value.place(height=15,x=5,y=210)
-		self.edit_show_hash160.place(height=15,width=300,x=150,y=210)
+		self.edit_show_hash160.place(height=15,width=300,x=100,y=210)
+		self.label_hash_info.place(height=15,x=100,y=235)
 
 		self.calc_hashlock()
 
 	def calc_hashlock(self,event=None):
 		#preimage=bytes.fromhex(self.editHashlock.get())  interpret input as hex number
 		preimage=self.editHashlock.get().encode()        #interpret input as string
-		print("Preimage "+str(preimage))
-		if(len(preimage)<10):
-			self.edit_show_hash160.configure(state='normal',fg="#ff0000")
+
+		if(len(preimage)==0):
+			self.label_hash_info.configure(text="Enter a preimage, generate a random preimage, or just enter the hash")
+			self.edit_show_hash160.configure(fg="#ff0000")
 			self.edit_show_hash160.delete(0, 'end')
-			self.edit_show_hash160.insert(0,"Your input is too short. This can be brute forced easily.")
-			self.edit_show_hash160.configure(state='disabled')
 			self.buttonScript.configure(state='disabled')
-			self.hash160=None
 			return
+		elif(len(preimage)<10):
+			self.label_hash_info.configure(text="Your input is too short. This can be brute forced easily.")
+			self.edit_show_hash160.configure(fg="#ff0000")
+			self.buttonScript.configure(state='disabled')
 		else:
-			self.edit_show_hash160.configure(state='normal',fg="#000000")
+			self.label_hash_info.configure(text="Enter a preimage, generate a random preimage, or just enter the hash")
+			self.edit_show_hash160.configure(fg="#000000")
 			self.buttonScript.configure(state='normal')
-		
+
 		
 		hash_160=hash160(preimage)
-		print("Hash160: "+str(hash_160.hex()))
 
 		self.edit_show_hash160.delete(0, 'end')
 		self.edit_show_hash160.insert(0,str(hash_160.hex()))
-		self.edit_show_hash160.configure(state='disabled')
+		#self.edit_show_hash160.configure(state='disabled')
 
 		self.hash160=hash_160
 
+	def use_custom_hashlock(self,event=None):
+		if(event.keycode==17):return
+		self.editHashlock.delete(0, 'end')
+		typed_hash_string=self.typed_hash.get()
+
+
+		if(len(typed_hash_string)==40):
+			try:
+				self.hash160=bytes.fromhex(self.typed_hash.get())
+				self.edit_show_hash160.configure(fg="#000000")
+				self.buttonScript.configure(state='normal')
+				self.label_hash_info.configure(text="Enter a preimage, generate a random preimage, or just enter the hash")
+			except:
+				self.label_hash_info.configure(text="Your hash is not valid. Only hexadecimal characters allowed")
+		else:
+			self.label_hash_info.configure(text="The hash must have 40 hexadecimal characters")
+			self.hash160=None
+			self.edit_show_hash160.configure(fg="#ff0000")
+			self.buttonScript.configure(state='disabled')
+			return
+
+		
+
 	def createScript(self,label=None,x_pos=None,y_pos=None,timelockdelay=None,timelock=None,hash160=None):
 
-		if(global_.gl_gui_build_address.taproot_container):
-			global_.gl_console.printText("Can't create a script when taproot address is already created")
+		if(config.gl_gui_build_address.taproot_container):
+			config.gl_console.printText("Can't create a script when taproot address is already created")
 			return
 
 		if(label is None):label=self.editLabel.get()
@@ -601,18 +658,18 @@ class c_Container_PubKey (c_Container):
 
 			if(len(self.editRelTimelock.get())>0):
 				if(self.editRelTimelock.get().isnumeric()==False):
-					global_.gl_console.printText("TimeLock must be a positive number or empty")
+					config.gl_console.printText("TimeLock must be a positive number or empty")
 					return
 				if(int (self.editRelTimelock.get())>65535 or int (self.editRelTimelock.get())<=0):
-					global_.gl_console.printText("Rel TimeLock must be between 1 and 65535")
+					config.gl_console.printText("Rel TimeLock must be between 1 and 65535")
 					return
 
 			elif(len(self.editAbsTimelock.get())>0):
 				if(self.editAbsTimelock.get().isnumeric()==False):
-					global_.gl_console.printText("TimeLock must be a positive number or empty")
+					config.gl_console.printText("TimeLock must be a positive number or empty")
 					return
 				if(int (self.editAbsTimelock.get())>16777216 or int(self.editAbsTimelock.get())<=0):
-					global_.gl_console.printText("Abs TimeLock must be bewteen 1 and 16777216")
+					config.gl_console.printText("Abs TimeLock must be bewteen 1 and 16777216")
 					return
 
 			if(len(self.editRelTimelock.get())>0):
@@ -637,7 +694,7 @@ class c_Container_PubKey (c_Container):
 		parent_array.append(self)
 		
 		child=c_Container_Script(label,tapLeaf,tapleaf_hash,x_pos,y_pos,timelockdelay,timelock,hash160,parent_array,self.is_mine,self.has_extended_parent)
-		global_.gl_gui_build_address.script_container_array.append(child)
+		config.gl_gui_build_address.script_container_array.append(child)
 		
 		
 		self.childList.append(child)
@@ -654,12 +711,12 @@ class c_Container_PubKey (c_Container):
 		else:
 			if(len(self.parent_array)>0):
 				txt=("Extended Key not available"+"\nIndex:"+
-					str(global_.gl_current_child_index)+":"+
-					str(shortenHexString(str(self.pubkey[global_.gl_current_child_index]),14,11)))
+					str(config.gl_current_child_index)+":"+
+					str(shortenHexString(str(self.pubkey[config.gl_current_child_index]),14,11)))
 			else:
 				txt=(str(shortenHexString(str(self.ext_key.wif_public()),14,11))+"\nIndex:"+
-					str(global_.gl_current_child_index)+":"+
-					str(shortenHexString(str(self.pubkey[global_.gl_current_child_index]),14,11)))
+					str(config.gl_current_child_index)+":"+
+					str(shortenHexString(str(self.pubkey[config.gl_current_child_index]),14,11)))
 		self.label_label1.config(text=txt)
 
 class c_Container_Script(c_Container):
@@ -679,7 +736,7 @@ class c_Container_Script(c_Container):
 			self.script.append(tapL.script)
 
 		maximum_index=len(self.tapLeaf)-1
-		index=min(maximum_index,global_.gl_current_child_index)
+		index=min(maximum_index,config.gl_current_child_index)
 		c_Container.__init__(self,x,y,label0=label,label1=str(tapleaf[index].script.hex()),parent_array=parent_array,is_mine=is_mine,has_extended_parent=has_extended_parent)
 		
 		
@@ -726,7 +783,7 @@ class c_Container_Script(c_Container):
 		self.scriptWindow.geometry("650x120")
 
 		maximum_index=len(self.tapLeaf)-1
-		index=min(maximum_index,global_.gl_current_child_index)
+		index=min(maximum_index,config.gl_current_child_index)
 
 		label=tk.Label(self.scriptWindow,text="Script:    "+str(self.label0)+":")
 		label.pack()
@@ -755,43 +812,46 @@ class c_Container_Script(c_Container):
 			data_string = tk.StringVar()
 			data_string.set(str(self.timelock))
 		else:
-			label=tk.Label(self.scriptWindow,text="TimeLock: None")
+			label=tk.Label(self.scriptWindow,text="TimeLock:")
+			data_string = tk.StringVar()
+			data_string.set("None")
 		
 		label.pack()
 		label.place(x=5,y=65)
 
-		if(self.timelockDelay>0 or self.timelock>0):
-			e=tk.Entry(self.scriptWindow,textvariable=data_string,fg="black",bg="white",bd=0,state="readonly")
-			e.pack()
-			e.place(x=150,y=67,width=400)
+		#if(self.timelockDelay>0 or self.timelock>0):
+		e=tk.Entry(self.scriptWindow,textvariable=data_string,fg="black",bg="white",bd=0,state="readonly")
+		e.pack()
+		e.place(x=150,y=67,width=400)
+
+		label=tk.Label(self.scriptWindow,text="Hashlock (HASH160):")
+		label.pack()
+		label.place(x=5,y=90)
 
 		if(self.hash160 is not None):
-			label=tk.Label(self.scriptWindow,text="Hashlock (HASH160):")
-			label.pack()
-			label.place(x=5,y=90)
+			
 			data_string = tk.StringVar()
 			data_string.set(str(self.hash160.hex()))
-			e=tk.Entry(self.scriptWindow,textvariable=data_string,fg="black",bg="white",bd=0,state="readonly")
-			e.pack()
-			e.place(x=150,y=92,width=400)
+			#e=tk.Entry(self.scriptWindow,textvariable=data_string,fg="black",bg="white",bd=0,state="readonly")
+			#e.pack()
+			#e.place(x=150,y=92,width=400)
 
 		else:
-			label=tk.Label(self.scriptWindow,text="Hashlock (HASH160): None")
-			label.pack()
-			label.place(x=5,y=90)
-
-
-	def createTapbranch(self):
-		tapBranch,hash_=tapTree.construct_Tapbranch(self.script)
-		parent_array=[]
-		parent_array.append(self)
-		child=global_.gl_gui_build_address.add_hash_container(self.editLabel.get(),tapBranch,hash_,parent_array)
-		self.childList.append(child)
+			data_string = tk.StringVar()
+			data_string.set("None")
+		e=tk.Entry(self.scriptWindow,textvariable=data_string,fg="black",bg="white",bd=0,state="readonly")
+		e.pack()
+		e.place(x=150,y=92,width=400)
 
 	
 	def update_index(self):
+		len_=len(self.tapLeaf)
 		if(len(self.tapLeaf)<2):return
-		txt="Script: "+str(shortenHexString(str(self.script[global_.gl_current_child_index].hex()),14,11)+"\n")
+
+		index=config.gl_current_child_index
+		if(len_-1<config.gl_current_child_index):index=len_-1
+
+		txt="Script: "+str(shortenHexString(str(self.script[index].hex()),14,11)+"\n")
 		if(self.timelockDelay>0):txt=txt+"Rel Timelock: "+str(self.timelockDelay)
 		elif(self.timelock>0):txt=txt+"Abs Timelock: "+str(self.timelock)
 		if(self.hash160 is not None):
@@ -800,13 +860,22 @@ class c_Container_Script(c_Container):
 			else:
 				txt+=" Hashlock: "+str(shortenHexString(self.hash160.hex(),14,11))
 
+		self.label_label1.config(text=txt)
+
+		len_=len(self.hash_)
+		
+		index=config.gl_current_child_index
+		if(len_-1<config.gl_current_child_index):index=len_-1
+
+		txt="Hash "+str(index)+": "+str(shortenHexString(str(self.hash_[index].hex()),14,11))
+		self.label_label3.config(text=txt)
 
 
 class c_Container_Hash(c_Container):
 	def __init__(self,x_pos,y_pos,label,tapLeaf,hash_,parent_array,is_mine=False,has_extended_parent=False):
 
 		#if(hash_ is not None):
-		c_Container.__init__(self,x_pos,y_pos,label,None,str(hash_[global_.gl_current_child_index].hex()),parent_array=parent_array,is_mine=is_mine,has_extended_parent=has_extended_parent)
+		c_Container.__init__(self,x_pos,y_pos,label,None,str(hash_[config.gl_current_child_index].hex()),parent_array=parent_array,is_mine=is_mine,has_extended_parent=has_extended_parent)
 		#else:
 		#	c_Container.__init__(self,x_pos,y_pos,label,None,parent_array=parent_array,is_mine=is_mine,has_extended_parent=True)
 
@@ -818,29 +887,34 @@ class c_Container_Hash(c_Container):
 		self.label_label1.place(x=4, y=17,height=15,width=self.sizeX-10)
 
 		if(self.x_pos==None):
-			random_=randrange(0,100)
+			random_=random.randrange(0,100)
 			self.x_pos=20+random_*10
 
-		if(self.y_pos>global_.gl_gui.guiy-self.sizeY):self.y_pos=global_.gl_gui.guiy-self.sizeY
+		if(self.y_pos>config.gl_gui.guiy-self.sizeY):self.y_pos=config.gl_gui.guiy-self.sizeY
 
 		
 
 
-		if(self.y_pos>global_.gl_gui.guiy-self.sizeY):self.y_pos=global_.gl_gui.guiy-self.sizeY
+		if(self.y_pos>config.gl_gui.guiy-self.sizeY):self.y_pos=config.gl_gui.guiy-self.sizeY
 
 		self.container.place(height=self.sizeY,width=self.sizeX, x=self.x_pos,y=self.y_pos)
 
 		self.updateLine()
 		if(len(self.parent_array)==1):self.buttonExit.destroy()
 
-		txt="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),14,11))
+		txt="Hash "+str(config.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[config.gl_current_child_index].hex()),14,11))
 		self.label_label1.config(text=txt)
 
 
 	
 
 	def update_index(self):
-		txt="Hash "+str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.hash_[global_.gl_current_child_index].hex()),14,11))
+		len_=len(self.hash_)
+		
+		index=config.gl_current_child_index
+		if(len_-1<config.gl_current_child_index):index=len_-1
+
+		txt="Hash "+str(index)+": "+str(shortenHexString(str(self.hash_[index].hex()),14,11))
 		self.label_label1.config(text=txt)
 
 class c_Container_Taproot(c_Container):
@@ -866,37 +940,37 @@ class c_Container_Taproot(c_Container):
 		#if(self.merkleRoot is not None):
 		#	if(self.merkleRoot.tapLeaf is None):has_extended_parent=True
 
-		for i in range(0,global_.gl_address_generation_max):    #if(has_extended_parent==False):
-			a=0 if(len(self.internalKey.pubkey)==1) else i
+		for address_index in range(0,config.gl_address_generation_max):    #if(has_extended_parent==False):
+			a=0 if(len(self.internalKey.pubkey)==1) else address_index
 			#b=0 if(len(self.merkleRoot.tapLeaf)==1) else i
 
 			if(self.merkleRoot==None):#No scripts involved
 				self.tapTweak_bytes.append( test_framework.tagged_hash("TapTweak", self.internalKey.pubkey[a].get_bytes()))
 		
 			else:#With scriptTree
-				a=0 if(len(self.internalKey.pubkey)==1) else i
-				b=0 if(len(self.merkleRoot.tapLeaf)==1) else i
+				a=0 if(len(self.internalKey.pubkey)==1) else address_index
+				b=0 if(len(self.merkleRoot.tapLeaf)==1) else address_index
 				taptree = taproot.TapTree(key=self.internalKey.pubkey[a], root=merkleRoot.tapLeaf[b])
 				taptree = taptree.construct()
 				self.tapTweak_bytes.append(taptree[1])
 				self.taptree.append(taptree)
 
-			taproot_pubkey_b = self.internalKey.pubkey[a].tweak_add(self.tapTweak_bytes[i]).get_bytes()
-			self.TapRootAddress.append(test_framework.program_to_witness(1, taproot_pubkey_b,main=global_.gl_mainnet))
-			self.tapTweak.append(test_framework.ECKey().set(self.tapTweak_bytes[i]))
+			taproot_pubkey_b = self.internalKey.pubkey[a].tweak_add(self.tapTweak_bytes[address_index]).get_bytes()
+			self.TapRootAddress.append(test_framework.program_to_witness(1, taproot_pubkey_b,main=config.gl_mainnet))
+			self.tapTweak.append(test_framework.ECKey().set(self.tapTweak_bytes[address_index]))
 			self.tweakedPubkey.append(test_framework.ECPubKey().set(taproot_pubkey_b))
 
 
 			if(self.internalKey.privkey is not None):
-				if(len(self.internalKey.privkey)>i):
-					tweak_p=self.internalKey.privkey[i].add(self.tapTweak_bytes[i])
-					tweak_p,pub=test_framework.generate_bip340_key_pair(tweak_p.secret)#createTapRootFromPriv(str(self.tweaked_privkey.secret))[0]
+				if(len(self.internalKey.privkey)>address_index):
+					tweak_p=self.internalKey.privkey[address_index].add(self.tapTweak_bytes[address_index])
+					tweak_p,pub=test_framework.generate_bip340_key_pair(tweak_p.secret)
 					self.tweaked_privkey.append(tweak_p)
 			
-			if(self.tweakedPubkey[i].get_y()%2!=0):
-				self.tweakedPubkey[i].negate()
-				self.tapTweak[i].negate()
-				self.internalKey.pubkey[i].negate()
+			if(self.tweakedPubkey[address_index].get_y()%2!=0):
+				self.tweakedPubkey[address_index].negate()
+				self.tapTweak[address_index].negate()
+				self.internalKey.pubkey[address_index].negate()
 
 			if(len(self.internalKey.pubkey)==1 and self.merkleRoot==None):break
 			if(len(self.internalKey.pubkey)==1 and len(self.merkleRoot.tapLeaf)==1):break
@@ -905,11 +979,11 @@ class c_Container_Taproot(c_Container):
 		if(merkleRoot):parents=[internalKey,merkleRoot]
 		else: parents=[internalKey]
 
-		if(len(self.TapRootAddress)>global_.gl_current_child_index):
-			global_.gl_current_child_index=len(self.TapRootAddress)-1
-		c_Container.__init__(self,x_pos,y_pos,label0="Taproot Address",label1=self.TapRootAddress[global_.gl_current_child_index],parent_array=parents,is_mine=True,has_extended_parent=has_extended_parent)
+		if(len(self.TapRootAddress)>config.gl_current_child_index):
+			config.gl_current_child_index=len(self.TapRootAddress)-1
+		c_Container.__init__(self,x_pos,y_pos,label0="Taproot Address",label1=self.TapRootAddress[config.gl_current_child_index],parent_array=parents,is_mine=True,has_extended_parent=has_extended_parent)
 		self.label_label0.config(text="Taproot Address")
-		if(y_pos>global_.gl_gui.guiy-self.sizeY):y_pos=global_.gl_gui.guiy-self.sizeY
+		if(y_pos>config.gl_gui.guiy-self.sizeY):y_pos=config.gl_gui.guiy-self.sizeY
 
 		#self.label0="Taproot Address"
 		#self.label_label0.config(text=self.label0)
@@ -921,10 +995,10 @@ class c_Container_Taproot(c_Container):
 		self.utxoList=[]
 		self.utxoSelected=[]
 		self.containerChooseUTXO=None
-		global_.gl_gui_build_address.canvasUTXO=None
+		config.gl_gui_build_address.canvasUTXO=None
 		self.scrollable_frame=None
 
-		txt=str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.TapRootAddress[global_.gl_current_child_index]),14,11))
+		txt=str(config.gl_current_child_index)+": "+str(shortenHexString(str(self.TapRootAddress[config.gl_current_child_index]),14,11))
 		self.label_label1.config(text=txt)
 
 		
@@ -936,12 +1010,12 @@ class c_Container_Taproot(c_Container):
 		
 
 	def remove_unused_container(self):
-		for i in range (0,len(global_.gl_gui_build_address.pubkey_container_array)):
-			global_.gl_gui_build_address.pubkey_container_array[i].active=False
-		for i in range (0,len(global_.gl_gui_build_address.script_container_array)):
-			global_.gl_gui_build_address.script_container_array[i].active=False
-		for i in range (0,len(global_.gl_gui_build_address.hash_container_array)):
-			global_.gl_gui_build_address.hash_container_array[i].active=False
+		for i in range (0,len(config.gl_gui_build_address.pubkey_container_array)):
+			config.gl_gui_build_address.pubkey_container_array[i].active=False
+		for i in range (0,len(config.gl_gui_build_address.script_container_array)):
+			config.gl_gui_build_address.script_container_array[i].active=False
+		for i in range (0,len(config.gl_gui_build_address.hash_container_array)):
+			config.gl_gui_build_address.hash_container_array[i].active=False
 
 		self.internalKey.active=True
 		self.internalKey.setParentActive()
@@ -951,30 +1025,30 @@ class c_Container_Taproot(c_Container):
 			self.merkleRoot.setParentActive()
 
 		a=0
-		for i in range (0,len(global_.gl_gui_build_address.pubkey_container_array)):
-			if(a>=len(global_.gl_gui_build_address.pubkey_container_array)):break
-			if(global_.gl_gui_build_address.pubkey_container_array[a]):
-				if(global_.gl_gui_build_address.pubkey_container_array[a].active==False):
-					container=global_.gl_gui_build_address.pubkey_container_array[a]
-					global_.gl_gui_build_address.pubkey_container_array.remove(container)
+		for i in range (0,len(config.gl_gui_build_address.pubkey_container_array)):
+			if(a>=len(config.gl_gui_build_address.pubkey_container_array)):break
+			if(config.gl_gui_build_address.pubkey_container_array[a]):
+				if(config.gl_gui_build_address.pubkey_container_array[a].active==False):
+					container=config.gl_gui_build_address.pubkey_container_array[a]
+					config.gl_gui_build_address.pubkey_container_array.remove(container)
 					container.remove_container()
 				else:a+=1
 		a=0
-		for i in range (0,len(global_.gl_gui_build_address.script_container_array)):
-			if(a>=len(global_.gl_gui_build_address.script_container_array)):break
-			if(global_.gl_gui_build_address.script_container_array[a]):
-				if(global_.gl_gui_build_address.script_container_array[a].active==False):
-					container=global_.gl_gui_build_address.script_container_array[a]
-					global_.gl_gui_build_address.script_container_array.remove(container)
+		for i in range (0,len(config.gl_gui_build_address.script_container_array)):
+			if(a>=len(config.gl_gui_build_address.script_container_array)):break
+			if(config.gl_gui_build_address.script_container_array[a]):
+				if(config.gl_gui_build_address.script_container_array[a].active==False):
+					container=config.gl_gui_build_address.script_container_array[a]
+					config.gl_gui_build_address.script_container_array.remove(container)
 					container.remove_container()
 				else:a+=1
 		a=0
-		for i in range (0,len(global_.gl_gui_build_address.hash_container_array)):
-			if(a>=len(global_.gl_gui_build_address.hash_container_array)):break
-			if(global_.gl_gui_build_address.hash_container_array[a]):
-				if(global_.gl_gui_build_address.hash_container_array[a].active==False):
-					container=global_.gl_gui_build_address.hash_container_array[a]
-					global_.gl_gui_build_address.hash_container_array.remove(container)
+		for i in range (0,len(config.gl_gui_build_address.hash_container_array)):
+			if(a>=len(config.gl_gui_build_address.hash_container_array)):break
+			if(config.gl_gui_build_address.hash_container_array[a]):
+				if(config.gl_gui_build_address.hash_container_array[a].active==False):
+					container=config.gl_gui_build_address.hash_container_array[a]
+					config.gl_gui_build_address.hash_container_array.remove(container)
 					container.remove_container()
 				else:a+=1
 		
@@ -991,22 +1065,21 @@ class c_Container_Taproot(c_Container):
 		
 		super().remove_container(False)
 		try:
-			del global_.gl_gui_build_address.taproot_container.utxoList[:]
+			del config.gl_gui_build_address.taproot_container.utxoList[:]
 		except:
 			pass
-		global_.gl_gui_build_address.taproot_container=None
-		global_.gl_gui_address_tab.button_checkBalance.place_forget()
-		global_.gl_gui_transaction_tab.button_checkBalance.place_forget()
-		global_.gl_gui_key.init_page_1()
+		config.gl_gui_build_address.taproot_container=None
+		config.gl_gui.button_checkBalance.place_forget()
+		config.gl_gui_key.init_page_1()
 
-		global_.gl_gui_transaction_tab.label_selected.config(text="Selected Coins: 0 BTC")
-		for child in global_.gl_gui_transaction_tab.scrollable_frame_utxo.winfo_children():
+		config.gl_gui_transaction_tab.label_selected.config(text="Selected Coins: 0 BTC")
+		for child in config.gl_gui_transaction_tab.scrollable_frame_utxo.winfo_children():
 			child.destroy()
 		
 
 	def update_index(self):
 		
-		txt=str(global_.gl_current_child_index)+": "+str(shortenHexString(str(self.TapRootAddress[global_.gl_current_child_index]),14,11))
+		txt=str(config.gl_current_child_index)+": "+str(shortenHexString(str(self.TapRootAddress[config.gl_current_child_index]),14,11))
 		self.label_label1.config(text=txt)
 
 	def get_index_of_address(self,address):

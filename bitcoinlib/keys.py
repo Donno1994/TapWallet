@@ -488,7 +488,7 @@ class Address(object):
 
     @classmethod
     def parse(cls, address, compressed=None, encoding=None, depth=None, change=None,
-              address_index=None, network=None, network_overrides=None):
+              address_index=None, network=None, network_overrides=None,version=0):
         """
         Import an address to the Address class. Specify network if available, otherwise it will be
         derived form the address.
@@ -524,13 +524,19 @@ class Address(object):
         if network is None:
             network = addr_dict['network']
         script_type = addr_dict['script_type']
-        return Address(hashed_data=public_key_hash_bytes, prefix=prefix, script_type=script_type,
+
+        if(version==1):
+            return Address(hashed_data=public_key_hash_bytes, prefix=prefix, script_type=script_type,
+                       compressed=compressed, encoding=addr_dict['encoding'], depth=depth, change=change,
+                       address_index=address_index, network=network, network_overrides=network_overrides,address=address)
+        else:
+            return Address(hashed_data=public_key_hash_bytes, prefix=prefix, script_type=script_type,
                        compressed=compressed, encoding=addr_dict['encoding'], depth=depth, change=change,
                        address_index=address_index, network=network, network_overrides=network_overrides)
 
     def __init__(self, data='', hashed_data='', prefix=None, script_type=None,
                  compressed=None, encoding=None, witness_type=None, depth=None, change=None,
-                 address_index=None, network=DEFAULT_NETWORK, network_overrides=None):
+                 address_index=None, network=DEFAULT_NETWORK, network_overrides=None,address=None):
         """
         Initialize an Address object. Specify a public key, redeemscript or a hash.
 
@@ -613,7 +619,10 @@ class Address(object):
                 self.prefix = self.network.prefix_bech32
         else:
             raise BKeyError("Encoding %s not supported" % self.encoding)
-        self.address = pubkeyhash_to_addr(self.hash_bytes, prefix=self.prefix, encoding=self.encoding)
+        if(address is None):
+            self.address = pubkeyhash_to_addr(self.hash_bytes, prefix=self.prefix, encoding=self.encoding)
+        else:
+            self.address=address
         self.address_orig = None
         provider_prefix = None
         if network_overrides and 'prefix_address_p2sh' in network_overrides and self.script_type == 'p2sh':
@@ -741,10 +750,10 @@ class Key(object):
         :return: Key object
         """
         self.public_hex = None
-        self.public_uncompressed_hex = None
+        self._public_uncompressed_hex = None
         self.public_compressed_hex = None
         self.public_byte = None
-        self.public_uncompressed_byte = None
+        self._public_uncompressed_byte = None
         self.public_compressed_byte = None
         self.private_byte = None
         self.private_hex = None
@@ -798,7 +807,7 @@ class Key(object):
             self.secret = None
             pub_key = to_hexstring(import_key)
             if len(pub_key) == 130:
-                self.public_uncompressed_hex = pub_key
+                self._public_uncompressed_hex = pub_key
                 self.x_hex = pub_key[2:66]
                 self.y_hex = pub_key[66:130]
                 self._y = int(self.y_hex, 16)
@@ -813,18 +822,11 @@ class Key(object):
                 self.public_hex = pub_key
                 self.x_hex = pub_key[2:66]
                 self.compressed = True
-                # Calculate y from x with y=x^3 + 7 function
-                sign = pub_key[:2] == '03'
                 self._x = int(self.x_hex, 16)
-                ys = pow(self._x, 3, secp256k1_p) + 7 % secp256k1_p
-                self._y = mod_sqrt(ys)
-                if self._y & 1 != sign:
-                    self._y = secp256k1_p - self._y
-                self.y_hex = change_base(self._y, 10, 16, 64)
-                self.public_uncompressed_hex = '04' + self.x_hex + self.y_hex
                 self.public_compressed_hex = pub_key
             self.public_compressed_byte = bytes.fromhex(self.public_compressed_hex)
-            self.public_uncompressed_byte = bytes.fromhex(self.public_uncompressed_hex)
+            if self._public_uncompressed_hex:
+                self._public_uncompressed_byte = bytes.fromhex(self._public_uncompressed_hex)
             if self.compressed:
                 self.public_byte = self.public_compressed_byte
             else:
@@ -906,11 +908,11 @@ class Key(object):
                 prefix = '02'
 
             self.public_compressed_hex = prefix + self.x_hex
-            self.public_uncompressed_hex = '04' + self.x_hex + self.y_hex
+            self._public_uncompressed_hex = '04' + self.x_hex + self.y_hex
             self.public_hex = self.public_compressed_hex if self.compressed else self.public_uncompressed_hex
 
             self.public_compressed_byte = bytes.fromhex(self.public_compressed_hex)
-            self.public_uncompressed_byte = bytes.fromhex(self.public_uncompressed_hex)
+            self._public_uncompressed_byte = bytes.fromhex(self._public_uncompressed_hex)
             self.public_byte = self.public_compressed_byte if self.compressed else self.public_uncompressed_byte
         self._address_obj = None
         self._wif = None
@@ -962,9 +964,30 @@ class Key(object):
 
     @property
     def y(self):
-        if not self._y and self.y_hex:
+        if not self._y:
+            if not self.y_hex:
+                self._public_uncompressed_hex = self.public_uncompressed_hex
             self._y = int(self.y_hex, 16)
         return self._y
+
+    @property
+    def public_uncompressed_hex(self):
+        if not self._public_uncompressed_hex:
+            # Calculate y from x with y=x^3 + 7 function
+            sign = self.public_hex[:2] == '03'
+            ys = pow(self._x, 3, secp256k1_p) + 7 % secp256k1_p
+            self._y = mod_sqrt(ys)
+            if self._y & 1 != sign:
+                self._y = secp256k1_p - self._y
+            self.y_hex = change_base(self._y, 10, 16, 64)
+            self._public_uncompressed_hex = '04' + self.x_hex + self.y_hex
+        return self._public_uncompressed_hex
+
+    @property
+    def public_uncompressed_byte(self):
+        if not self._public_uncompressed_byte:
+            self._public_uncompressed_byte = bytes.fromhex(self.public_uncompressed_hex)
+        return self._public_uncompressed_byte
 
     def hex(self):
         return self.public_hex
@@ -2022,7 +2045,7 @@ class Signature(object):
         :type private: HDKey, Key, str, hexstring, bytes
         :param use_rfc6979: Use deterministic value for k nonce to derive k from txid/message according to RFC6979 standard. Default is True, set to False to use random k
         :type use_rfc6979: bool
-        :param k: Provide own k. Only use for testing or if you known what you are doing. Providing wrong value for k can result in leaking your private key!
+        :param k: Provide own k. Only use for testing or if you know what you are doing. Providing wrong value for k can result in leaking your private key!
         :type k: int
         
         :return Signature: 
@@ -2308,7 +2331,7 @@ def sign(txid, private, use_rfc6979=True, k=None):
     :type private: HDKey, Key, str, hexstring, bytes
     :param use_rfc6979: Use deterministic value for k nonce to derive k from txid/message according to RFC6979 standard. Default is True, set to False to use random k
     :type use_rfc6979: bool
-    :param k: Provide own k. Only use for testing or if you known what you are doing. Providing wrong value for k can result in leaking your private key!
+    :param k: Provide own k. Only use for testing or if you know what you are doing. Providing wrong value for k can result in leaking your private key!
     :type k: int
         
     :return Signature: 

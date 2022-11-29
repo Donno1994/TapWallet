@@ -3,7 +3,7 @@
 import tkinter as tk
 from tkinter import ttk
 
-import global_
+import config
 import encryption
 import wallet
 import bitcoinlib
@@ -29,7 +29,7 @@ class class_gui():
 		self.root = tk.Tk()
 		self.root.title("TapRoot Wallet by https://twitter.com/BR_Robin . Only testnet recommended")
 
-		global_.gl_gui=self
+		config.gl_gui=self
 		
 
 		self.guix=1470
@@ -86,14 +86,14 @@ class class_gui():
 		#self.window_key=window.window_key(self,self.tab_key)
 		#self.window_address=window.window_address(self,self.tab_address)
 
-		global_.gl_gui_key=window.gui_key_tab(self.tab_key)
-		global_.gl_gui_address=window.gui_address_tab(self.tab_address)
-		global_.gl_gui_build_address=window.gui_build_address_canvas()
-		global_.gl_gui_create_tx=window.gui_create_tx(self.tab_transaction)
+		config.gl_gui_key=window.gui_key_tab(self.tab_key)
+		config.gl_gui_address=window.gui_address_tab(self.tab_address)
+		config.gl_gui_build_address=window.gui_build_address_canvas()
+		config.gl_gui_create_tx=window.gui_create_tx(self.tab_transaction)
 
 		blockchain.startThread(blockchain.initService)#calls function in background, this establishes communication with blockchain providers
 
-
+		
 
 		
 		
@@ -102,8 +102,8 @@ class class_gui():
 
 def init_gui():
 	gui=class_gui()
-	global_.gl_console=console.Console()
-	#global_.init_globals()
-	global_.gl_gui.root.mainloop()
+	config.gl_console=console.Console()
+	#config.init_globals()
+	config.gl_gui.root.mainloop()
 
 	
