@@ -356,8 +356,6 @@ class gui_key_tab:
 		self.page_new_seed.pack()
 		self.page_new_seed.place(x=5,y=5,height=400,width=850)
 
-		seed_words=""
-
 		text_label=tk.Label(self.page_new_seed,text="Enter a short label:");text_label.pack();text_label.place(x=5,y=5)
 		self.entry_Label=tk.Entry(self.page_new_seed);self.entry_Label.pack();self.entry_Label.place(height=20, x=120, y=5);
 
@@ -376,45 +374,55 @@ class gui_key_tab:
 		text_seed=tk.Label(self.page_new_seed,text="BIP 32 Seed: Create a new random seed, or enter your own 12 or 24 word seed");text_seed.pack();text_seed.place(x=5,y=40)
 		self.entry_seed = tk.Entry(self.page_new_seed,textvariable=stringvar,fg="black",bg="white",bd=0)
 		self.entry_seed.pack()
-		self.entry_seed.place(x=5,y=60,width=550,height=25)
+		self.entry_seed.place(x=8,y=60,width=547,height=25)
 		self.entry_seed.bind("<KeyRelease>", self.read_user_seed)
 
 		button_random_seed=tk.Button(self.page_new_seed,text="Create random seed",bg="#ffcc80",command=self.create_random_seed)
 		button_random_seed.pack()
 		button_random_seed.place(x=570,y=60)
 
-		self.text_seed_error=tk.Label(self.page_new_seed,text="error",fg="#FF0000");self.text_seed_error.pack();self.text_seed_error.place(x=140,y=90)
-
-		text_root_key=tk.Label(self.page_new_seed,text="BIP32 root key");text_root_key.pack();text_root_key.place(x=5,y=100)
-		self.entry_root_key=tk.Entry(self.page_new_seed,textvariable=stringvar2,fg="black",bg="white",bd=0,state="readonly")
-		self.entry_root_key.pack()
-		self.entry_root_key.place(x=5,y=120,width=780)
 		
 
-		text_xpub=tk.Label(self.page_new_seed,text="Extended Priv Key (m/86'/0'/0')");text_xpub.pack();text_xpub.place(x=5,y=160)
+		text_passphrase=tk.Label(self.page_new_seed,text="Optional passphrase");text_passphrase.pack();text_passphrase.place(x=5,y=92)
+		self.entry_passphrase = tk.Entry(self.page_new_seed,fg="black",bg="white",bd=0)
+		self.entry_passphrase.pack()
+		self.entry_passphrase.place(x=145,y=90,width=410,height=25)
+		self.entry_passphrase.bind("<KeyRelease>", self.read_user_seed)
+
+		text_root_key=tk.Label(self.page_new_seed,text="BIP32 root key");text_root_key.pack();text_root_key.place(x=5,y=130)
+		self.entry_root_key=tk.Entry(self.page_new_seed,textvariable=stringvar2,fg="black",bg="white",bd=0,state="readonly")
+		self.entry_root_key.pack()
+		self.entry_root_key.place(x=8,y=155,width=780)
+		
+
+		text_xpub=tk.Label(self.page_new_seed,text="Extended Key (m/86'/0'/0')");text_xpub.pack();text_xpub.place(x=5,y=185)
 		self.entry_extended_priv=tk.Entry(self.page_new_seed,textvariable=stringvar3,fg="black",bg="white",bd=0,state="readonly")
 		self.entry_extended_priv.pack()
-		self.entry_extended_priv.place(x=5,y=180,width=780)
+		self.entry_extended_priv.place(x=8,y=210,width=780)
 		self.entry_extended_pub=tk.Entry(self.page_new_seed,textvariable=stringvar4,fg="black",bg="white",bd=0,state="readonly")
 		self.entry_extended_pub.pack()
-		self.entry_extended_pub.place(x=5,y=200,width=780)
+		self.entry_extended_pub.place(x=8,y=235,width=780)
 		#network earn direct noodle course into purity stick alcohol screen update choose
 
 		
 			
-		text_key_pairs=tk.Label(self.page_new_seed,text="First public keys  (x-only pubkey, first byte is dropped)");text_key_pairs.pack();text_key_pairs.place(x=5,y=240)
-		self.text_pub_1=tk.Label(self.page_new_seed,text="m/86'/0'/0'/0/0: ");self.text_pub_1.pack();self.text_pub_1.place(x=5,y=260)
-		self.text_pub_2=tk.Label(self.page_new_seed,text="m/86'/0'/0'/0/1: ");self.text_pub_2.pack();self.text_pub_2.place(x=5,y=280)
-		self.text_pub_3=tk.Label(self.page_new_seed,text="m/86'/0'/0'/0/2: ");self.text_pub_3.pack();self.text_pub_3.place(x=5,y=300)
-
+		text_key_pairs=tk.Label(self.page_new_seed,text="First public keys  (x-only pubkey, first byte is dropped)");text_key_pairs.pack();text_key_pairs.place(x=5,y=265)
+		self.text_pub_1=tk.Label(self.page_new_seed,text="m/86'/0'/0'/0/0: ");self.text_pub_1.pack();self.text_pub_1.place(x=5,y=285)
+		self.text_pub_2=tk.Label(self.page_new_seed,text="m/86'/0'/0'/0/1: ");self.text_pub_2.pack();self.text_pub_2.place(x=5,y=305)
+		self.text_pub_3=tk.Label(self.page_new_seed,text="m/86'/0'/0'/0/2: ");self.text_pub_3.pack();self.text_pub_3.place(x=5,y=325)
+		
 		button_back=tk.Button(self.page_new_seed,text="Back",bg="#DC7A7A",command=self.init_page_1)
 		button_back.pack()
-		button_back.place(x=5,y=330)
+		button_back.place(x=5,y=355)
 
 		self.button_continue=tk.Button(self.page_new_seed,text="Add extended key to key pool",bg="#0099FF",state=tk.DISABLED,command=self.add_pubkey_container)
 		self.button_continue.pack()
-		self.button_continue.place(x=105,y=330)
+		self.button_continue.place(x=105,y=355)
+		
+		self.text_seed_error=tk.Label(self.page_new_seed,text="error",fg="#FF0000");self.text_seed_error.pack();self.text_seed_error.place(x=240,y=185)
 
+		self.seed_counter=0 # used to stop several seed generation calls
+		
 		self.read_user_seed(None)
 
 	def create_random_seed(self):
@@ -424,7 +432,14 @@ class gui_key_tab:
 		self.enter_seed_details(seed_words)
 
 	def read_user_seed(self,event):
+		
+		thread=Thread(target=self.read_user_seed_thread)
+		thread.start()
+
+	def read_user_seed_thread(self):
+
 		#When the user is typing a seed, this function will check if it valid after each input
+		
 
 		seed_words=self.entry_seed.get()
 		if(len(seed_words)==0):
@@ -432,7 +447,6 @@ class gui_key_tab:
 			return
 
 		try:
-			root_key=bitcoinlib.keys.HDKey().from_passphrase(seed_words)
 			self.enter_seed_details(seed_words)
 			
 		except Exception as e:
@@ -449,13 +463,17 @@ class gui_key_tab:
 		#	- xprv and xpub (derivation path m/86'/0'/0' )
 		#	- first three generated public keys (derivation path m/86'/0'/0'/0/0 - m/86'/0'/0'/0/2)
 
+		self.seed_counter+=1
+		seed_counter=self.seed_counter
+
 		stringvar = tk.StringVar()
 		stringvar2 = tk.StringVar()
 		stringvar3 = tk.StringVar()
 		stringvar4 = tk.StringVar()
 
 		if(seed_words):
-			root_key=bitcoinlib.keys.HDKey().from_passphrase(seed_words)
+			root_key=bitcoinlib.keys.HDKey().from_passphrase(seed_words,password=self.entry_passphrase.get())
+			if(seed_counter!=self.seed_counter):return
 			account_0=root_key.subkey_for_path("m/86'/0'/0'")
 			self.ext_key=account_0
 			#self.ext_pub=account_0.wif_public()
@@ -477,19 +495,21 @@ class gui_key_tab:
 			stringvar4.set("")
 			self.button_continue.configure(state=tk.DISABLED)
 
+		if(seed_counter!=self.seed_counter):return
+
 		#text_seed=tk.Label(self.page_new_seed,text="Write down your seed. This will not be shown again.");text_seed.pack();text_seed.place(x=5,y=40)
-		text_seed=tk.Label(self.page_new_seed,text="BIP 32 Seed: Create a new random seed, or enter your own 12 or 24 word seed");text_seed.pack();text_seed.place(x=5,y=40)
+		#text_seed=tk.Label(self.page_new_seed,text="BIP 32 Seed: Create a new random seed, or enter your own 12 or 24 word seed");text_seed.pack();text_seed.place(x=5,y=40)
 		
 
-		button_random_seed=tk.Button(self.page_new_seed,text="Create random seed",command=self.create_random_seed)
-		button_random_seed.pack()
-		button_random_seed.place(x=570,y=60)
+		#button_random_seed=tk.Button(self.page_new_seed,text="Create random seed",command=self.create_random_seed)
+		#button_random_seed.pack()
+		#button_random_seed.place(x=570,y=60)
 
-		text_root_key=tk.Label(self.page_new_seed,text="BIP32 root key");text_root_key.pack();text_root_key.place(x=5,y=100)
+		#text_root_key=tk.Label(self.page_new_seed,text="BIP32 root key");text_root_key.pack();text_root_key.place(x=5,y=100)
 		self.entry_root_key.configure(text=stringvar2)
 		
 
-		text_xpub=tk.Label(self.page_new_seed,text="Extended Priv Key");text_xpub.pack();text_xpub.place(x=5,y=160)
+		#text_xpub=tk.Label(self.page_new_seed,text="Extended Priv Key");text_xpub.pack();text_xpub.place(x=5,y=160)
 		self.entry_extended_priv.configure(text=stringvar3)
 		self.entry_extended_pub.configure(text=stringvar4)
 
@@ -504,8 +524,9 @@ class gui_key_tab:
 					child_key.negate()
 
 				example_keys.append(child_key)
+
+			if(seed_counter!=self.seed_counter):return
 			
-		text_key_pairs=tk.Label(self.page_new_seed,text="First public keys (x-only pubkey, first byte is dropped):");text_key_pairs.pack();text_key_pairs.place(x=5,y=240)
 		self.text_pub_1.configure(text="m/86'/0'/0'/0/0: "+str(example_keys[0].get_pubkey())) if seed_words else self.text_pub_1.configure(text="m/86'/0'/0'/0/0:")
 		self.text_pub_2.configure(text="m/86'/0'/0'/0/1: "+str(example_keys[1].get_pubkey())) if seed_words else self.text_pub_2.configure(text="m/86'/0'/0'/0/1:")
 		self.text_pub_3.configure(text="m/86'/0'/0'/0/2: "+str(example_keys[2].get_pubkey())) if seed_words else self.text_pub_3.configure(text="m/86'/0'/0'/0/2:")
