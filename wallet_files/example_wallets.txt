@@ -1,0 +1,3 @@
+You can open example wallets within the tapwallet application.
+The password of the file is the name of the file.
+Eg. If you load "alice.wallet" you would enter "alice" as password.

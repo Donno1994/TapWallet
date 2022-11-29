@@ -84,6 +84,7 @@ class Block:
             self.nonce = to_bytes(nonce)
             self.nonce_int = 0 if not self.nonce else int.from_bytes(self.nonce, 'big')
         self.transactions = transactions
+        self.transactions_dict = []
         if self.transactions is None:
             self.transactions = []
         self.txs_data = None
@@ -95,6 +96,9 @@ class Block:
         self.page = 1
         self.limit = 0
         self.height = height
+        self.total_in = 0
+        self.total_out = 0
+        self.size = 0
         if self.transactions and len(self.transactions) and isinstance(self.transactions[0], Transaction) \
                 and self.version_int > 1:
             # first bytes of unlocking script of coinbase transaction contains block height (BIP0034)
@@ -156,7 +160,9 @@ class Block:
         """
 
         if isinstance(raw, bytes):
-            return cls.parse_bytesio(BytesIO(raw), block_hash, height, parse_transactions, limit, network)
+            b = cls.parse_bytesio(BytesIO(raw), block_hash, height, parse_transactions, limit, network)
+            b.size = len(raw)
+            return b
         else:
             return cls.parse_bytesio(raw, block_hash, height, parse_transactions, limit, network)
 
@@ -191,7 +197,9 @@ class Block:
         """
 
         raw_bytesio = BytesIO(raw_bytes)
-        return cls.parse_bytesio(raw_bytesio, block_hash, height, parse_transactions, limit, network)
+        b = cls.parse_bytesio(raw_bytesio, block_hash, height, parse_transactions, limit, network)
+        b.size = len(raw_bytes)
+        return b
 
     @classmethod
     def parse_bytesio(cls, raw, block_hash=None, height=None, parse_transactions=False, limit=0,
@@ -264,7 +272,7 @@ class Block:
 
     @classmethod
     @deprecated
-    def from_raw(cls, raw, block_hash=None, height=None, parse_transactions=False, limit=0, network=DEFAULT_NETWORK):
+    def from_raw(cls, raw, block_hash=None, height=None, parse_transactions=False, limit=0, network=DEFAULT_NETWORK):  # pragma: no cover
         """
         Create Block object from raw serialized block in bytes.
 
@@ -340,9 +348,10 @@ class Block:
     def parse_transactions(self, limit=0):
         """
         Parse raw transactions from Block, if transaction data is available in txs_data attribute. Creates
-        Transaction objects in Block.transactions list
+        Transaction objects in Block.
 
         :param limit: Maximum number of transactions to parse
+        :type limit: int
 
         :return:
         """
@@ -351,6 +360,133 @@ class Block:
             t = Transaction.parse_bytesio(self.txs_data, strict=False, network=self.network)  # , check_size=False
             self.transactions.append(t)
             n += 1
+
+    def parse_transactions_dict(self):
+        """
+        Parse raw transactions from Block, if transaction data is available in txs_data attribute. Returns a list of
+        transactions dictionaries.
+
+        Only works if transactions are not parsed yet with :func:`parse_transactions` or parse_transactions=True when
+        creating a new block object.
+
+        :return:
+        """
+        tx_n = 0
+        transactions_dict = []
+        txs_data_orig = deepcopy(self.txs_data)
+        while self.txs_data and len(self.transactions) < self.tx_count:
+            tx = self.parse_transaction_dict(tx_n)
+            if not tx:
+                break
+            transactions_dict.append(tx)
+            tx_n += 1
+        self.txs_data = txs_data_orig
+        return transactions_dict
+            
+    def parse_transaction(self):
+        """
+        Parse a single transaction from Block, if transaction data is available in txs_data attribute. Add
+        Transaction object in Block and return the transaction
+
+        :return Tranasaction:
+        """
+        if self.txs_data and len(self.transactions) < self.tx_count:
+            t = Transaction.parse_bytesio(self.txs_data, strict=False, network=self.network)  # , check_size=False
+            self.transactions.append(t)
+            return t
+        return False
+
+    def parse_transaction_dict(self, tx_n):
+        """
+        Parse a single transaction from Block, if transaction data is available in txs_data attribute. Add
+        Transaction object in Block and return the transaction
+
+        :return Tranasaction:
+        """
+        if self.txs_data and len(self.transactions) < self.tx_count:
+            tx = {'height': self.height, 'coinbase': False, 'flag': None, 'witness_type': 'legacy'}
+
+            tx['version'] = self.txs_data.read(4)[::-1]
+            if not tx['version']:
+                return False
+            raw_flag = b''
+            if self.txs_data.read(1) == b'\0':
+                flag = self.txs_data.read(1)
+                if flag == b'\1':
+                    tx['witness_type'] = 'segwit'
+                raw_flag += b'\0\1'
+            else:
+                self.txs_data.seek(-1, 1)
+
+            n_inputs, raw_n_inputs = read_varbyteint_return(self.txs_data)
+
+            inputs = []
+            inputs_raw = b''
+            for n in range(0, n_inputs):
+                inp = {}
+                inp['prev_txid'] = self.txs_data.read(32)[::-1]
+                if len(inp['prev_txid']) != 32:
+                    raise Exception("Input transaction hash not found. Probably malformed self.txs_data transaction")
+                inp['output_n'] = self.txs_data.read(4)[::-1]
+                unlocking_script_size, unlocking_script_size_raw = read_varbyteint_return(self.txs_data)
+                inp['unlocking_script'] = self.txs_data.read(unlocking_script_size)
+                inp['inp_type'] = 'legacy'
+                if tx['witness_type'] == 'segwit' and not unlocking_script_size:
+                    inp['inp_type'] = 'segwit'
+                inp['sequence_number'] = self.txs_data.read(4)
+                tx['coinbase'] = False
+                if inp['prev_txid'] == 32 * b'\0':
+                    tx['coinbase'] = True
+                inputs.append(inp)
+                inputs_raw += \
+                    inp['prev_txid'][::-1] + inp['output_n'][::-1] + unlocking_script_size_raw + \
+                    inp['unlocking_script'] + inp['sequence_number']
+            tx['inputs'] = inputs
+
+            outputs = []
+            outputs_raw = b''
+            n_outputs, raw_n_outputs = read_varbyteint_return(self.txs_data)
+            tx['output_total'] = 0
+            for n in range(0, n_outputs):
+                outp = {}
+                outp_value = self.txs_data.read(8)
+                outp['value'] = int.from_bytes(outp_value[::-1], 'big')
+                lock_script_size, lock_script_size_raw = read_varbyteint_return(self.txs_data)
+                outp['lock_script'] = self.txs_data.read(lock_script_size)
+                outputs.append(outp)
+                outp['output_n'] = n
+                tx['output_total'] += outp['value']
+                outputs_raw += outp_value + lock_script_size_raw + outp['lock_script']
+            if not outputs:
+                raise Exception("Error no outputs found in this transaction")
+            tx['outputs'] = outputs
+
+            witnesses_raw = b''
+            if tx['witness_type'] == 'segwit':
+                for n in range(0, len(inputs)):
+                    n_items, raw_n_items = read_varbyteint_return(self.txs_data)
+                    witnesses_raw += raw_n_items
+                    if not n_items:
+                        continue
+                    # script = Script()
+                    inputs[n]['witnesses'] = []
+                    for m in range(0, n_items):
+                        item_size, raw_item_size = read_varbyteint_return(self.txs_data)
+                        witnesses_raw += raw_item_size
+                        witness = self.txs_data.read(item_size)
+                        witnesses_raw += witness
+                        inputs[n]['witnesses'].append(witness)
+
+            tx_locktime = self.txs_data.read(4)
+            tx['locktime'] = int.from_bytes(tx_locktime[::-1], 'big')
+            tx['rawtx'] = tx['version'][::-1] + raw_flag + raw_n_inputs + inputs_raw + raw_n_outputs + outputs_raw + \
+                          witnesses_raw + tx_locktime
+            tx['txid'] = double_sha256(tx['version'][::-1] + raw_n_inputs + inputs_raw + raw_n_outputs + outputs_raw
+                                       + tx_locktime)[::-1]
+            tx['size'] = len(tx['rawtx'])
+            # TODO: tx['vsize'] = len(tx['rawtx'])
+            return tx
+        return False
 
     def as_dict(self):
         """
@@ -514,3 +650,10 @@ class Block:
                 bips.append('BIP101')   # Increase block size 8MB (rejected)
 
         return bips
+
+    def update_totals(self):
+        self.total_in = 0
+        self.total_out = 0
+        for t in self.transactions:
+            self.total_in += sum([i.value for i in t.inputs])
+            self.total_out += sum([o.value for o in t.outputs])

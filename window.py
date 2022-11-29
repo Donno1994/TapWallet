@@ -2,147 +2,277 @@ import copy
 import tkinter as tk
 from tkinter import ttk
 from tkinter.simpledialog import askstring
-import global_ 
+from threading import Thread
+
 import bitcoinlib
+import bitcoinlib.transactions
 import test_framework
+from bitcoin_core_framework.script import hash160
+
+import config 
 import container
 import console
 import taproot
 import blockchain
 import encryption
-
+import tx_history
 from helperFunctions import *
 from musig1 import c_MultiSig
-from bitcoin_core_framework.script import hash160
 
 var=0
 
 
 def make_lambda(a):
-	return lambda event:global_.gl_gui_build_address.count_up(a)
+	return lambda event:config.gl_gui_build_address.count_up(a)
+
 
 class class_gui():
 	
 
-	#Graphical User Interface - Main
-	#initiate the outer window and definde window size
+	# Graphical User Interface - Main
+	# initiate the outer window and definde window size
 
 	def __init__(self):
+
 		self.root = tk.Tk()
 		self.root.title("TapRoot Wallet by https://twitter.com/BR_Robin . Only testnet recommended")
-		self.first_init=True
-		self.bool_ask_for_save=None
-		global_.gl_gui=self
-		
-
-		self.guix=500
-		self.guiy=900
-		self.root.geometry("450x150")
-
-		info_text=("TapWallet is a wallet by @BR_Robin\n"
-					"I am a hobby programmer who delevoped this in my spare time.\n"
-					"This wallet is still full of bugs, so I recommend it for testnet use only.")
-		label_info = tk.Label(self.root, justify=tk.LEFT,text=info_text);
-		label_info.pack()
-		label_info.place(x=4,y=10)
-
-		button_create_new=tk.Button(self.root,text="Create a new wallet",bg="#00e64d",command=self.load_main_wallet)
-		button_create_new.pack()
-		button_create_new.place(x=5,y=85)
-
-		#self.label_file_name = tk.Label(self.root, justify=tk.LEFT,text="Enter wallet name");
-		#self.label_file_name.pack()
-		#self.label_file_name.place(x=5,y=110)
-
-		button_load_wallet=tk.Button(self.root,text="Load an existing wallet",bg="#0099ff",command=encryption.load_wallet)
-		button_load_wallet.pack()
-		button_load_wallet.place(x=300,y=85)
-
-		blockchain.startThread(blockchain.initService)#calls function in background, this establishes communication with blockchain providers
-
-		self.root.protocol('WM_DELETE_WINDOW', self.ask_user_to_save_file)
-
-	def ask_user_to_save_file(self):
-
-		if(self.bool_ask_for_save):
-			answer = tk.messagebox.askyesno(title='Save wallet?',
-						message='Do you want to save your wallet before you exit?')
-			if answer:
-				success=encryption.save_wallet()
-
-				if(success==False):
-					return
-		
-		self.root.destroy()
-
-
-
-
-
-	def load_main_wallet(self):
-
-		self.first_init=False
+		self.bool_ask_for_save=True
+		self.label_show_server_status=None
+		config.gl_gui=self
 
 		self.guix=1470
-		self.guiy=900
+		self.guiy=900		
 
-		
+		self.main_wallet_page= tk.LabelFrame(self.root)
+		self.main_wallet_page.pack()
+		self.main_wallet_page.place(x=0,y=0,height=self.guiy,width=self.guix)
 
-		my_menu=tk.Menu(self.root) # for creating the menu bar
-		m1=tk.Menu(my_menu,tearoff=0)  # tear0ff=0 will remove the tearoff option ,its default value is 1 means True which adds a  tearoff line
-		m1.add_command(label="Save",command=encryption.save_wallet)
-		#m1.add_command(label="Save to new file",command=encryption.save_wallet_to_new_file)
-		#m1.add_command(label="Open Wallet",command=encryption.load_wallet)
+		tab_control=ttk.Notebook(self.main_wallet_page)
 
-		my_menu.add_cascade(label="Options",menu=m1)
-
-		#m2 = tk.Menu(my_menu)
-		#m2.add_command(label="Copy all")
-		#m2.add_command(label="Clear all")
-		#m2.add_command(label="Undo")
-		#m2.add_command(label="Redo")
-		#m2.add_command(label="Delete")
-
-		#my_menu.add_cascade(label="Edit",menu=m2)
-
-		#all the values in command attribute are functions
-		#my_menu.add_command(label="Exit")
-
-		self.root.config(menu=my_menu)
-
-		self.root.geometry("1470x900")
-		self.window_main_gui= tk.LabelFrame(self.root)
-		self.window_main_gui.pack()
-		self.window_main_gui.place(x=0,y=0,height=self.guiy,width=self.guix)
-
-		tab_control=ttk.Notebook(self.window_main_gui)
-
-
-		self.tab_key=tk.Frame(tab_control)#Create Keys tab
+		self.tab_history=tk.Frame(tab_control)#Create History tab
 		self.tab_address=tk.Frame(tab_control)#Create Address tab
 		self.tab_transaction=tk.Frame(tab_control)#Create Transaction tab
 
-		tab_control.add(self.tab_key, text='Create Keys and Addresses')
+		tab_control.add(self.tab_history, text='Tx History')
 		tab_control.add(self.tab_address, text='See Addresses')
 		tab_control.add(self.tab_transaction, text='Create Transaction')
 		tab_control.pack(expand=1, fill="both")
 
-		#init different classes for the window tabs
-		global_.gl_gui_key=gui_key_tab(self.tab_key)
-		global_.gl_gui_address_tab=gui_address_tab(self.tab_address)
-		global_.gl_gui_build_address=gui_build_address_canvas()
-		global_.gl_gui_transaction_tab=gui_transaction_tab(self.tab_transaction)
-		global_.gl_console=console.Console()
 
-		#blockchain.startThread(blockchain.initService)#calls function in background, this establishes communication with blockchain providers
+		self.welcome_page=None
+
+		config.gl_gui_key=None
+		config.gl_gui_build_address=None
+
+		self.close_all_windows()
+		self.create_welcome_page()
+		
+
+	def close_all_windows(self,show_pages=[]):
+		
+		if(self.welcome_page is not None):self.welcome_page.forget()
+		
+		self.main_wallet_page.place(x=0,y=0,height=self.guiy,width=self.guix)
+			
+		if(config.gl_gui_key is not None):config.gl_gui_key.root.forget()
+
+	def create_welcome_page(self):
+		
+		self.guix=600
+		self.guiy=375
+		self.root.geometry("600x375")
+
+		self.welcome_page=tk.LabelFrame(self.root)
+		self.welcome_page.pack(fill=tk.BOTH, expand=True)
+		#welcome_page.place(x=0,y=0,width=300,height=80)
+
+
+		info_text=("TapWallet is a wallet by @BR_Robin\n"
+					"I am a hobby programmer who delevoped this in my spare time.\n"
+					"This wallet is still full of bugs, so I recommend it for testnet use only.")
+		label_info = tk.Label(self.welcome_page, justify=tk.LEFT,text=info_text);
+		label_info.pack()
+
+		button_create_new=tk.Button(self.welcome_page,text="Create wallet",command=self.create_new_wallet_page)
+		button_create_new.pack()
+		button_create_new.place(x=15,y=100,width=80)
+
+		info_text="Create new wallet, choose location and name of new wallet"
+		label_info = tk.Label(self.welcome_page,text=info_text);
+		label_info.pack()
+		label_info.place(x=110,y=100)
+
+		button_load_wallet=tk.Button(self.welcome_page,text="Load wallet",command=encryption.load_wallet)
+		button_load_wallet.pack()
+		button_load_wallet.place(x=15,y=140,width=80)
+
+		info_text="Load existing wallet, choose wallet in file explorer"
+		label_info = tk.Label(self.welcome_page,text=info_text);
+		label_info.pack()
+		label_info.place(x=110,y=140)
+
+		blockchain.startThread(blockchain.init_service_loop) # calls function in background, this establishes communication with blockchain providers
+
+		self.root.protocol('WM_DELETE_WINDOW', self.ask_user_to_save_file)
+		
+
+	def create_new_wallet_page(self):
+	
+		# loads the field where keys are created and the bottom field where containers are displayed
+
+		if(encryption.wallt_file is None):
+			success=encryption.save_wallet()
+			if(success==False):return
+
+		self.guix=1470
+		self.guiy=900		
+		self.root.geometry("1470x900")
+
+		self.close_all_windows()
+
+		
+
+		config.gl_gui_key=gui_key_tab()
+		config.gl_gui_build_address=gui_build_address_canvas()
+		
+	def create_main_wallet_page(self):
+
+		# loads the other necessary windows (alls the tabs) that are needed once the wallet is created
+		# fetch latest blockheight from service provider to display blockheight
+
+		self.guix=1470
+		self.guiy=900		
+		self.root.geometry("1470x900")
+
+		self.close_all_windows(show_pages=[self.main_wallet_page])
+
+		my_menu=tk.Menu(self.root)
+		m1=tk.Menu(my_menu,tearoff=0)
+		m1.add_command(label="Save",command=encryption.save_wallet)
+
+		my_menu.add_cascade(label="Wallet",menu=m1)
+
+		m2=tk.Menu(my_menu,tearoff=0)
+		m2.add_command(label="Configurations",command=self.change_config)
+		my_menu.add_cascade(label="Options",menu=m2)
+
+
+		self.root.config(menu=my_menu)
+
+		config.gl_gui_history=tx_history.init(self.tab_history)
+		config.gl_gui_address_tab=gui_address_tab(self.tab_address)
+		config.gl_gui_transaction_tab=gui_transaction_tab(self.tab_transaction)
+		config.gl_console=console.Console()
+		
+		self.label_show_server_status = tk.Label(self.root,font=('Arial',10,'bold'));
+		self.label_show_server_status.place(relx=1.0,rely=0.0,anchor="ne")
+
+		self.button_checkBalance = tk.Button(self.root,text="Check Balance",bg="#00469b",fg="#FFFFFF",command=config.gl_gui_address_tab.checkBalance)
+		self.button_checkBalance.pack(padx=300,anchor="ne")
+
+		blockchain.get_blockheight_from_service()
+
+
+	def ask_user_to_save_file(self):
+		
+		if(config.gl_gui_key is None):
+			self.root.destroy()
+			blockchain.continue_endless_loop=False
+			return
+
+		
+		if(config.gl_gui_build_address.taproot_container is None):
+			answer = tk.messagebox.askyesno(title='Save wallet?',
+						message='Do you want to save your wallet before you exit?')
+			if answer:
+				success=encryption.save_wallet(True)
+
+				if(success==False):
+					return
+
+		else:
+			success=encryption.save_wallet()
+
+			if(success==False):
+				return
+		
+		self.root.destroy()
+		blockchain.continue_endless_loop=False
+
+
+	def change_config(self):
+
+		config_window = tk.Toplevel(self.root)
+		config_window.title("Configuation")
+		config_window.geometry("600x400")
+		
+
+		## Base Unit
+
+		label_base_unit=tk.Label(config_window,text="Base Unit")
+		label_base_unit.grid(row=0,column=0,sticky="w")
+
+		self.base_unit = tk.StringVar()
+		self.base_unit.set("Sats") # default value
+
+		w = tk.OptionMenu(config_window, self.base_unit, "BTC", "Sats",command=self.apply_config)
+		w.grid(row=0,column=1,sticky="w")
+
+
+		## Auto Update Balance
+
+		label_update_balance=tk.Label(config_window,text="Sync balance automatically")
+		label_update_balance.grid(row=1,column=0,sticky="w")
+
+		self.auto_update_time = tk.StringVar()
+		self.auto_update_time.set("Every 1 min") # default value
+
+		options=("Off","Every 1 minute","Every 2 minutes","Every 5 minutes","Every 10 minutes")
+		w = tk.OptionMenu(config_window, self.auto_update_time, *options,command=self.apply_config)
+		w.grid(row=1,column=1,sticky="w")
+
+		## Gap Limit
+
+		label_gap_limit=tk.Label(config_window,text="Gap limit")
+		label_update_balance.grid(row=2,column=0,sticky="w")
+
+		self.gap_limit=tk.IntVar()
+		self.gap_limit.set(5)
+
+		options=("1,5,10,20")
+		w = tk.OptionMenu(config_window, self.gap_limit, *options,command=self.apply_config)
+		w.grid(row=2,column=1,sticky="w")
+
+		
+
+
+	def apply_config(self,event=None):
+		
+		if(self.base_unit.get()=="BTC"):config.gl_base_unit="BTC"
+		else: config.gl_base_unit="Sats"
+
+		if(self.auto_update_time.get()=="Off"):config.gl_auto_update_time=0
+		elif(self.auto_update_time.get()=="Every 1 minute"):config.gl_auto_update_time=60
+		elif(self.auto_update_time.get()=="Every 2 minutes"):config.gl_auto_update_time=120
+		elif(self.auto_update_time.get()=="Every 5 minutes"):config.gl_auto_update_time=300
+		elif(self.auto_update_time.get()=="Every 10 minutes"):config.gl_auto_update_time=600
+
+		config.gl_gap_limit=self.gap_limit.get()
+
+		tx_history.show_transactions()
+		config.gl_gui_transaction_tab.label_amount.configure(text="Amount in "+config.gl_base_unit)
+
+
 
 class gui_key_tab:
-	#window tab 'Create Keys and Addresses'
-	#here we create/import all keys that will be needed for the taproot address
 
-	def __init__(self,tab_key_creation):
-		global_.gl_gui
-		self.root=tab_key_creation
+	# here we create/import all keys that will be needed for the taproot address
+
+	def __init__(self):
+
+		self.root=tk.LabelFrame(config.gl_gui.root)
+		self.root.pack(fill=tk.BOTH, expand=True)
+
 		self.var_is_mine=tk.IntVar(value=True)
 		
 		self.ext_key=None
@@ -153,25 +283,24 @@ class gui_key_tab:
 
 
 	def init_page_1(self):
-		#First window that is shown on wallet startup
+
+		# First window that is shown on wallet startup
 
 		
-
-		self.del_old_vars()
 		try:self.page_new_seed.place_forget()
 		except:pass
 		try:self.page_new_extended.place_forget()
 		except:pass
 		try:self.page_single_key.place_forget()
 		except:pass
-
+		
 		self.page_1= tk.LabelFrame(self.root)
 		self.page_1.pack()
 		self.page_1.place(x=5,y=5,height=400,width=600)
 
-		#If a taproot address was already created, just show an info text. Otherwise show buttons to create keys.
-		if(global_.gl_gui_build_address is not None):
-			if(global_.gl_gui_build_address.taproot_container is not None):
+		# If a taproot address was already created, just show an info text. Otherwise show buttons to create keys.
+		if(config.gl_gui_build_address is not None):
+			if(config.gl_gui_build_address.taproot_container is not None):
 				info_text=("You have already created a taproot address.\n"
 							"If you want to add any more keys, you have to delete the green taproot container in the window below.\n\n"
 							"ATTENTION:\nIf you change any of your keys, you will get a new taproot address with probably no funds.\n"
@@ -185,7 +314,7 @@ class gui_key_tab:
 		info_text=("You have to create keys for your taproot address\n"
 					"You can create or import a seed phrase (mnemonic phrase), extended keys (xpubs) or single keys\n"
 					"")
-		label_info = tk.Label(self.page_1, justify=tk.LEFT,text=info_text);
+		label_info = tk.Label(self.page_1,text=info_text,justify=tk.LEFT);
 		label_info.pack()
 		label_info.place(x=4,y=10)
 
@@ -197,19 +326,16 @@ class gui_key_tab:
 		radio_extended_key=tk.Radiobutton(self.page_1,text="Import an extended master key/ xpub  (xprv9xhWQW6gkX5JfDfLceirkZtwoPK2cZpv ...)",variable=self.radio_key,value=2)
 		radio_extended_key.pack()
 		radio_extended_key.place(x=5,y=85)
-		#radio_extended_key.configure(state = tk.DISABLED)#Not yet implemented
 
 		radio_single_key=tk.Radiobutton(self.page_1,text="Create or import a single private or public key  (a819408ce5010ca2e09ef59ac3d89f5ff8595d02b5 ...)",variable=self.radio_key,value=3)
 		radio_single_key.pack()
 		radio_single_key.place(x=5,y=110)
 
-		#radio_single_key=tk.Radiobutton(self.page_1,text="Import a single public key (usually a key of someone else)",variable=self.radio_key,value=5)
-		#radio_single_key.pack()
-		#radio_single_key.place(x=5,y=160)
-
 		self.button_continue=tk.Button(self.page_1,text="Next",bg="#0099ff",command=self.show_page_2)
 		self.button_continue.pack()
 		self.button_continue.place(x=5,y=150)
+
+		self.del_old_vars()
 
 	def show_page_2(self):
 		#Init second window page depending on radio button state
@@ -629,7 +755,6 @@ class gui_key_tab:
 				self.entry_PubKey.configure(fg="#000000")
 				self.button.configure(state=tk.NORMAL)
 				return; #return when pubkey has not changed
-		#del self.priv_key [:]
 
 		if(len(typedKey)>64 or len(typedKey)<64):
 			self.entry_PubKey.configure(fg="#ff0000");
@@ -698,12 +823,23 @@ class gui_key_tab:
 		#you can drag&drop them and create scripts and multisig keys from them
 		#this method is called when clicking the 'add key to pool' buttons
 
-		if(global_.gl_gui_build_address.taproot_container):
-			global_.gl_console.printText("Can't add more public keys when taproot address was already created")
+		if(config.gl_gui_build_address.taproot_container):
+			config.gl_console.printText("Can't add more public keys when taproot address was already created")
 			return
+
+		thread=Thread(target=self.add_pubkey_container_thread)
+		thread.start()
+
 		
-		global_.gl_gui_build_address.add_pubkey_container(self.entry_Label.get(),self.ext_key,self.priv_key,self.pub_key,[])
+		
+	def add_pubkey_container_thread(self):
+		e_label=self.entry_Label.get()
+		ext_key=self.ext_key
+		priv_key, pub_key = self.priv_key,self.pub_key
+		config.gl_gui_build_address.add_pubkey_container(e_label,ext_key,priv_key, pub_key,[])
 		self.init_page_1()
+		
+		
 
 class gui_address_tab:
 	#window tab 'See Addresses'
@@ -713,52 +849,59 @@ class gui_address_tab:
 
 	def __init__(self,tab_address_creation):
 		self.root=tab_address_creation
-		self.button_checkBalance=tk.Button(self.root,text="Check Balance",bg="#00469b",fg="#FFFFFF",command=self.init_window_after_taproot_generated_thread)
-		self.button_checkBalance.pack()
 
 	def init_window_after_taproot_generated(self,delay=0):
+
 		self.delay=delay
-		blockchain.startThread(self.init_window_after_taproot_generated_thread)
+		config.gl_gui.button_checkBalance.pack(padx=300,anchor="ne")
 		
-		self.button_checkBalance.place(height=20, x=10, y=200)
-		global_.gl_gui_transaction_tab.button_checkBalance.place(height=20, x=10, y=10)
-		global_.gl_gui_key.init_page_1()
-
-	def init_window_after_taproot_generated_thread(self):
 		
-		balance_list,utxo_list=blockchain.get_utxos_from_address_list()
+
+		thread=Thread(target=self.check_wallet_database)
+		thread.start()
 		
-		t = self.Table(self.root,balance_list)
-		global_.gl_gui_transaction_tab.update(utxo_list)
-		#global_.gl_gui_build_address.taproot_container.utxoList=utxo_list
+		
 
-	class Table: 
-		#init 10 rows to display 10 taproot addresses
+	def checkBalance(self,delay=0):
+		thread=Thread(target=blockchain.check_blockheight_and_balance)
+		thread.start()
 
-		def __init__(self,root,lst): 
-			total_rows=len(lst)
-			total_columns=len(lst[0]) 
+	def check_wallet_database(self):
 
-			for i in range(0,total_rows): 
-				for j in range(total_columns):
-					width=5
-					readonly=True
-					if(j==0):width=10
-					elif(j==1):width=5
-					elif(j==2):width=30
-					elif(j==3):
-						width=20
-						if(i>0):readonly=False
-					elif(j==4):width=15
-				
-					self.e = tk.Entry(root, width=width, fg='black',font=('Arial',8,'bold')) 
-                
-					self.e.grid(row=i, column=j) 
-					self.e.insert(tk.END, lst[i][j])
-					if(readonly):self.e.configure(state="readonly")
-					if(j==2 and i>0):self.e.bind('<Button-1>', make_lambda(a=i-1))
+		wallt_file=encryption.wallt_file
+		index = wallt_file.find("wallet_files/")
+		wallt_name = wallt_file[index+13:-7]
+		wallt_folder=wallt_file[:index+13]
+		print("Check if wallet database already exists")
+		wallet_exists_=bitcoinlib.wallets.wallet_exists(wallet=wallt_name,db_uri=wallt_folder+wallt_name+".db")
+		
+		if(wallet_exists_):
+			print("Open wallet database")
+		else:
+			tx_history.show_transactions(False)
+			print("Create wallet database")
+			config.gl_console.printText("Wallet database is being generated. This can take a few seconds.")
+		
 
-				global_.gl_gui_build_address.count_up(0)
+		network="bitcoin" if(config.gl_mainnet) else "testnet"
+		config.gl_wallet=bitcoinlib.wallets.wallet_create_or_open(
+			name=wallt_name,
+			network=network,
+			account_id=0,
+			db_uri=wallt_folder+wallt_name+".db")
+
+		
+		if(wallet_exists_ is False):
+			
+			for address in config.gl_gui_build_address.taproot_container.TapRootAddress:
+				print("Import address ",address," into database")
+				config.gl_wallet.import_key(bitcoinlib.wallets.Address.parse(address,version=1))
+
+			config.gl_console.printText("Wallet database completed")
+
+		tx_history.show_transactions()
+		self.checkBalance()
+		
 
 class gui_build_address_canvas:
 	#this part of the window is always shown
@@ -776,18 +919,18 @@ class gui_build_address_canvas:
 		self.editLabel=tk.StringVar() #label on second window 
 		
 
-		self.container_Script = tk.LabelFrame(global_.gl_gui.root)
-		self.container_Script.pack()
-		self.container_Script.place(height=global_.gl_gui.guiy-400,width=global_.gl_gui.guix-8, x=8,y=400)
+		self.container_Script = tk.LabelFrame(config.gl_gui.root)
+		self.container_Script.pack(fill=tk.X)
+		self.container_Script.place(height=config.gl_gui.guiy-405,width=config.gl_gui.guix-5, x=5,y=405)
 
 		
 		self.canvas = tk.Canvas(self.container_Script)
 		self.canvas.pack(fill=tk.BOTH, expand=1)
-		global_.gl_gui.root.bind('<KeyRelease>',self.check_key_released)
+		config.gl_gui.root.bind('<KeyRelease>',self.check_key_released)
 
 		info_text=("Create a blue container by creating some public keys above. You can drag any container or select them with 'control.'\n"
 					"Double click a blue container to create a script. Select several blue containers with 'control' to create multisig.\n"
-					"Select two green (hash) containers two create a child hash.\n"
+					"Select two green (hash) containers to create a child hash.\n"
 					"Finally select one green container (merkle root) and one blue container (your primary spend key) to create a taproot address.")
 		self.info_instructions = tk.Label(self.container_Script, justify=tk.LEFT,text=info_text);
 		self.info_instructions.pack()
@@ -799,6 +942,8 @@ class gui_build_address_canvas:
 
 		self.button_show_instructions=tk.Button(self.container_Script,text="Show info",command=self.show_instructions)
 		self.button_show_instructions.pack()
+		self.button_show_instructions.place(x=0,y=0,height=15)
+		self.button_show_instructions.place_forget()
 
 	def hide_instructions(self):
 		
@@ -818,7 +963,8 @@ class gui_build_address_canvas:
 		self.editLabel=tk.StringVar() #label on second window 
 		
 	def count_up(self,val=None):
-		global_.gl_current_child_index=val
+		
+		config.gl_current_child_index=val
 		for container in self.pubkey_container_array:
 			container.update_index()
 
@@ -834,38 +980,38 @@ class gui_build_address_canvas:
 
 
 	def calc_key_released_taproot(self,key=0,x_pos=None,y_pos=None):
-
+		
 		if(self.taproot_container):
-			global_.gl_console.printText("You must delete your taproot address before creating new scripts,keys or a new address")
-			return#If a Taproot address already exists, stop creating other containers
+			config.gl_console.printText("You must delete your taproot address before creating new scripts,keys or a new address")
+			return # If a Taproot address already exists, stop creating other containers
 
 		if(key!=0):
-			global_.gl_selected_container.clear()
-			global_.gl_selected_container.append(key)
+			config.gl_selected_container.clear()
+			config.gl_selected_container.append(key)
 
 		root_key=None
 		merkle=None
 
 		parent_array=[]
 		
-		for a in range (0, len(global_.gl_selected_container)):
-			parent_array.append(global_.gl_selected_container[a-1])
+		for a in range (0, len(config.gl_selected_container)):
+			parent_array.append(config.gl_selected_container[a-1])
 
 
 		
-		if(len(global_.gl_selected_container)==1):#No scripts involved
-			root_key=global_.gl_selected_container[0]
+		if(len(config.gl_selected_container)==1):#No scripts involved
+			root_key=config.gl_selected_container[0]
 
 		else:
 
 			for i in range (0,len(self.pubkey_container_array)):
-				if self.pubkey_container_array[i]==global_.gl_selected_container[0]:
-					root_key=global_.gl_selected_container[0]
-					merkle=global_.gl_selected_container[1]
+				if self.pubkey_container_array[i]==config.gl_selected_container[0]:
+					root_key=config.gl_selected_container[0]
+					merkle=config.gl_selected_container[1]
 					break
 			if(root_key==None):
-				root_key=global_.gl_selected_container[1]
-				merkle=global_.gl_selected_container[0]
+				root_key=config.gl_selected_container[1]
+				merkle=config.gl_selected_container[0]
 		
 
 		if(x_pos is None):
@@ -880,15 +1026,16 @@ class gui_build_address_canvas:
 				y_pos+=parent_array[0].sizeY+10
 
 		self.taproot_container=container.c_Container_Taproot(x_pos,y_pos,root_key,merkle)
-		global_.gl_gui_address_tab.init_window_after_taproot_generated()
-		global_.gl_gui_transaction_tab.entry_change_address.insert(0,global_.gl_gui_build_address.taproot_container.TapRootAddress[0])
-		
-		#thread_balance()
-		#guiTX.selectSigningMethod()
 
-		for a in range (0, len(global_.gl_selected_container)):
-			global_.gl_selected_container[a-1].childList.append(self.taproot_container)
-			global_.gl_selected_container[a-1].flag(event=None)
+
+		config.gl_gui.create_main_wallet_page()
+
+		config.gl_gui_address_tab.init_window_after_taproot_generated()
+
+
+		for a in range (0, len(config.gl_selected_container)):
+			config.gl_selected_container[a-1].childList.append(self.taproot_container)
+			config.gl_selected_container[a-1].flag(event=None)
 		
 		try:
 			if(key==0):self.scriptWindow.destroy()
@@ -907,35 +1054,33 @@ class gui_build_address_canvas:
 		is_mine=False
 		has_extended_parent=False
 
-		for i in range (0,len(global_.gl_selected_container)):
-			pubkey_array.append(global_.gl_selected_container[i].pubkey)
-			if(len(global_.gl_selected_container[i].pubkey)>1):
+		for selected_container in config.gl_selected_container:
+			#pubkey_array.append(selected_container.pubkey)
+			if(len(selected_container.pubkey)>1):
 				has_extended_parent=True
 		
-		if(len(pubkey_array)==0):
-			print("ERROR in calc_key_released_multisig. pubkey_array length 0")
-		
 		aggregate_key_list=[]
-		for a in range(0,global_.gl_address_generation_max):
+		for a in range(0,config.gl_address_generation_max):
 			del pubkey_array [:]
-			for i in range (0,len(global_.gl_selected_container)):
+			for selected_container in config.gl_selected_container:
 				
-				key=global_.gl_selected_container[i].pubkey[0] if len(global_.gl_selected_container[i].pubkey)==1 else global_.gl_selected_container[i].pubkey[a]
+				key=selected_container.pubkey[0] if len(selected_container.pubkey)==1 else selected_container.pubkey[a]
 				pubkey_array.append(key)
-				if(global_.gl_selected_container[i].is_mine):is_mine=True
-				if(a==0):parent_array.append(global_.gl_selected_container[i])
+				if(selected_container.is_mine):is_mine=True
+				if(a==0):parent_array.append(selected_container)
 
 			musig_c, aggregate_key=test_framework.generate_musig_key(pubkey_array)
 
 			if(aggregate_key.get_y()%2!=0):
 				aggregate_key.negate()
 			aggregate_key_list.append(aggregate_key)
+			if(has_extended_parent==False):break
 
 		child=self.add_pubkey_container(self.editLabel.get(),None,None,aggregate_key_list,parent_array,is_mine,has_extended_parent,x_pos=x_pos,y_pos=y_pos)
 
-		for a in range (0, len(global_.gl_selected_container)):
-			global_.gl_selected_container[0].childList.append(child)
-			global_.gl_selected_container[0].flag(event=None)
+		for a in range (0, len(config.gl_selected_container)):
+			config.gl_selected_container[0].childList.append(child)
+			config.gl_selected_container[0].flag(event=None)
 				
 
 		try:
@@ -947,8 +1092,8 @@ class gui_build_address_canvas:
 		tapbranch=[]
 		hash_=[]
 
-		con0=global_.gl_selected_container[0]
-		con1=global_.gl_selected_container[1]
+		con0=config.gl_selected_container[0]
+		con1=config.gl_selected_container[1]
 		
 		for i in range(max(len(con0.tapLeaf),len(con1.tapLeaf))):
 			tapb,h=taproot.construct_TapBranch(con0.tapLeaf[min(len(con0.tapLeaf)-1,i)],con1.tapLeaf[min(len(con1.tapLeaf)-1,i)],con0.hash_[min(len(con0.tapLeaf)-1,i)],con1.hash_[min(len(con1.tapLeaf)-1,i)])
@@ -956,18 +1101,18 @@ class gui_build_address_canvas:
 			hash_.append(h)
 
 		parent_array=[]
-		parent_array.append(global_.gl_selected_container[0])
-		parent_array.append(global_.gl_selected_container[1])
+		parent_array.append(config.gl_selected_container[0])
+		parent_array.append(config.gl_selected_container[1])
 		is_mine=False
-		if(global_.gl_selected_container[0].is_mine):is_mine=True
-		if(global_.gl_selected_container[1].is_mine):is_mine=True
+		if(config.gl_selected_container[0].is_mine):is_mine=True
+		if(config.gl_selected_container[1].is_mine):is_mine=True
 		#child=gui.add_hash_container(self.editLabel.get(),tapBranch,hash_,parent_array,is_mine)
 		child=self.add_hash_container("TapBranch",tapbranch,hash_,parent_array,is_mine,x_pos,y_pos)
-		global_.gl_selected_container[0].childList.append(child)
-		global_.gl_selected_container[1].childList.append(child)
+		config.gl_selected_container[0].childList.append(child)
+		config.gl_selected_container[1].childList.append(child)
 
-		for a in range (0, len(global_.gl_selected_container)):
-				global_.gl_selected_container[0].flag(event=None)
+		for a in range (0, len(config.gl_selected_container)):
+				config.gl_selected_container[0].flag(event=None)
 
 		try:
 			self.scriptWindow.destroy()
@@ -978,31 +1123,31 @@ class gui_build_address_canvas:
 	def check_key_released(self,event):
 		#When several container are flagged and "control key" is released,
 		#this function will check if it needs to create a new container
-		if len(global_.gl_selected_container)==0:
+		if len(config.gl_selected_container)==0:
 			return
 
 		if (event.keycode==17):#control key released
 
 			if(self.taproot_container):
-				global_.gl_console.printText("You must delete your taproot address before creating new scripts,keys or a new address")
-				for a in range (0, len(global_.gl_selected_container)):global_.gl_selected_container[0].flag(event=None)
+				config.gl_console.printText("You must delete your taproot address before creating new scripts,keys or a new address")
+				for a in range (0, len(config.gl_selected_container)):config.gl_selected_container[0].flag(event=None)
 				return#If a Taproot address already exists, stop creating other containers
 
 			pubkey_counter=0
 			hash_counter=0
 			
 			#this loop counts how many pubkeys and/or hashes are selected
-			for a in range (0, len(global_.gl_selected_container)):
+			for a in range (0, len(config.gl_selected_container)):
 				for i in range (0,len(self.pubkey_container_array)):
-					if self.pubkey_container_array[i]==global_.gl_selected_container[a]:
+					if self.pubkey_container_array[i]==config.gl_selected_container[a]:
 						pubkey_counter+=1
 						break
 				for i in range (0,len(self.hash_container_array)):
-					if self.hash_container_array[i]==global_.gl_selected_container[a]:
+					if self.hash_container_array[i]==config.gl_selected_container[a]:
 						hash_counter+=1
 						break
 				for i in range (0,len(self.script_container_array)):
-					if self.script_container_array[i]==global_.gl_selected_container[a]:
+					if self.script_container_array[i]==config.gl_selected_container[a]:
 						hash_counter+=1
 						break
 			#Possible scenarios are 
@@ -1012,26 +1157,26 @@ class gui_build_address_canvas:
 			# All other combinations will be rejected
 
 			if hash_counter>2 or (hash_counter==2 and pubkey_counter>0) or (hash_counter>0 and pubkey_counter>1) or (hash_counter==1 and pubkey_counter!=1) or (pubkey_counter==1 and hash_counter==0):
-				global_.gl_console.printText(text="Choose one of the following methods:")
-				global_.gl_console.printText(text="- Flag multiple pub keys to create a multisig key",keepOld=True)
-				global_.gl_console.printText(text="- Flag two hashes to create a child hash",keepOld=True)
-				global_.gl_console.printText(text="- Flag a pub key and a hash to create a taproot address",keepOld=True)
-				global_.gl_console.printText(text="- Flag a pub key to create a taproot address",keepOld=True)
-				for a in range (0, len(global_.gl_selected_container)):global_.gl_selected_container[0].flag(event=None)
+				config.gl_console.printText(text="Choose one of the following methods:")
+				config.gl_console.printText(text="- Flag multiple pub keys to create a multisig key",keepOld=True)
+				config.gl_console.printText(text="- Flag two hashes to create a child hash",keepOld=True)
+				config.gl_console.printText(text="- Flag a pub key and a hash to create a taproot address",keepOld=True)
+				config.gl_console.printText(text="- Flag a pub key to create a taproot address",keepOld=True)
+				for a in range (0, len(config.gl_selected_container)):config.gl_selected_container[0].flag(event=None)
 				return
 
 			if pubkey_counter>1:
-				for container in global_.gl_selected_container:
+				for container in config.gl_selected_container:
 					if (len(container.parent_array)>0):
-						global_.gl_console.printText(text="A MultiSig key can't be part of another MultiSig key")
-						for a in range (0, len(global_.gl_selected_container)):global_.gl_selected_container[0].flag(event=None)
+						print("A MultiSig key can't be part of another MultiSig key")
+						for a in range (0, len(config.gl_selected_container)):config.gl_selected_container[0].flag(event=None)
 						return
 
-			if len(global_.gl_selected_container)==0:#return if nothing is selected
+			if len(config.gl_selected_container)==0:#return if nothing is selected
 				return
 
 			#init Pop Up Window
-			self.scriptWindow = tk.Toplevel(global_.gl_gui.root)
+			self.scriptWindow = tk.Toplevel(config.gl_gui.root)
 			self.scriptWindow.geometry("600x400")
 
 			labelLabel=tk.Label(self.scriptWindow,text="Add a label")
@@ -1062,9 +1207,6 @@ class gui_build_address_canvas:
 			elif pubkey_counter==0 and hash_counter==2:
 				self.calc_key_released_tapbranch()
 				return
-				#self.scriptWindow.title("Create Tapbranch")
-				#self.editLabel.insert(0,"TapBranch")
-				#buttonScript=tk.Button(self.scriptWindow,text="Create TapBranch", command=self.calc_key_released_tapbranch)
 			else: return
 
 			buttonScript.pack()
@@ -1074,7 +1216,6 @@ class gui_build_address_canvas:
 		pubkey_copy=copy.deepcopy(pubKey)
 		privkey_copy=copy.deepcopy(privKey)
 
-		#if(isinstance(privKey,bitcoinlib.keys.Key)):has_extended_parent=True
 
 		if(len(parent_array)==2 and y_pos is None):
 			x_pos=(parent_array[0].x_pos+parent_array[1].x_pos)/2
@@ -1103,15 +1244,6 @@ class gui_build_address_canvas:
 				self.hash_container_array.remove(container)
 				break
 		
-	def add_tapleaf_container(self,label,tapLeaf,timelockDelay,timelock,hash_,parent_array,x,is_mine=False,has_extended_parent=False):
-		print("THIS FUNCTION SHOUDL NOT BE USED ANYMORE.")
-		container_=container.c_Container_Script(label,tapLeaf,hash_,timelockDelay,timelock,parent_array,is_mine,has_extended_parent)
-		parent=[]
-		parent.append(container_)
-		#container2=c_Container_Hash(container_.x_pos,container_.y_pos+container_.sizeY,label,tapLeaf,hash_,parent,is_mine)
-		#self.hash_container_array.append(container2)
-		self.script_container_array.append(container_)
-		return container_#,container2
 	
 	def remove_script_container(self,container):
 		self.script_container_array.remove(container)
@@ -1139,21 +1271,26 @@ class gui_build_address_canvas:
 
 class gui_transaction_tab:
 	def __init__(self,master,script=None,privKey=None,pubKey=None,timelockDelay=0):
+
+		"""Init the window where transactions are created"""
+
 		self.root=master
 		self.script=script
 		self.privkey=privKey
 		self.pubkey=pubKey
 		self.timelockDelay=timelockDelay
 		self.active_canvas=None
+		self.next_receive_index=0
+		self.next_receive_address=None
+		self.next_change_index=int(config.gl_address_generation_max/2) # second half of addresses are for change, index will not start at 0
+		self.next_change_address=None
+
+		# frame where utxos are displayed
 
 		self.containerChooseUTXO = tk.LabelFrame(self.root)
 		self.containerChooseUTXO.pack()
 		self.containerChooseUTXO.place(height=155,width=600, x=5,y=30)
 
-		
-		self.button_checkBalance=tk.Button(self.containerChooseUTXO,text="Check Balance",bg="#00469b",fg="#FFFFFF",command=global_.gl_gui_address_tab.init_window_after_taproot_generated_thread)
-		self.button_checkBalance.pack()
-		#self.button_checkBalance.place(height=20, x=10, y=10)
 
 		self.label_balance=tk.Label(self.containerChooseUTXO,text="Balance:---")
 		self.label_balance.pack();
@@ -1169,10 +1306,10 @@ class gui_transaction_tab:
 		container = tk.Frame(self.containerChooseUTXO,borderwidth=4)
 		container.pack()
 		container.place(height=100,width=595,x=0,y=50)
-		self.canvas_utxo = tk.Canvas(container)#,bg="#00FF00")
+		self.canvas_utxo = tk.Canvas(container)
 		self.canvas_utxo.place(height=0,width=0, x=0,y=0)
 		scrollbar = tk.Scrollbar(container, orient="vertical", command=self.canvas_utxo.yview)
-		self.scrollable_frame_utxo = tk.Frame(self.canvas_utxo,width=595,height=100)
+		self.scrollable_frame_utxo = tk.Frame(self.canvas_utxo,width=595,height=200)
 		self.scrollable_frame_utxo.place(x=0,y=50)
 		
 		
@@ -1183,15 +1320,11 @@ class gui_transaction_tab:
 
 		self.canvas_utxo.create_window(0, 0, window=self.scrollable_frame_utxo, anchor="w")
 		self.canvas_utxo.configure(yscrollcommand=scrollbar.set)
-
-
-		
-
-		
 		self.canvas_utxo.pack(side="left", fill="both", expand=True)
 		scrollbar.pack(side="right", fill="y")
 
-		##########################
+
+		# frame where you enter the recipient address and amount
 
 		self.containerCreateTX = tk.LabelFrame(self.root)
 		self.containerCreateTX.pack()
@@ -1220,17 +1353,12 @@ class gui_transaction_tab:
 
 		self.canvas_tx.create_window(0, 0, window=self.scrollable_frame_tx, anchor="w")
 		self.canvas_tx.configure(yscrollcommand=scrollbar2.set)
-
-
-		
-
-		
 		self.canvas_tx.pack(side="left", fill="both", expand=True)
 		scrollbar2.pack(side="right", fill="y")
 
 		##Static Key Information
-		#self.label_label=tk.Label(self.containerCreateTX,text="Label:");         self.label_label.pack();   self.label_label.place(height=20,x=4,y=2)
-		self.label_1=tk.Label(self.scrollable_frame_tx,text="Bitcoin address  					Amount");     self.label_1.pack(); self.label_1.place(height=20,x=187,y=2)
+		self.label_address=tk.Label(self.scrollable_frame_tx,text="Bitcoin address");     self.label_address.pack(); self.label_address.place(height=20,x=200,y=2)
+		self.label_amount=tk.Label(self.scrollable_frame_tx,text="Amount in "+config.gl_base_unit);     self.label_amount.pack(); self.label_amount.place(height=20,x=450,y=2)
 		
 		
 		self.button_add_address=tk.Button(self.scrollable_frame_tx,text="Add address",bg="#00469b",fg="#FFFFFF",command=self.add_address_field); self.button_add_address.pack(); self.button_add_address.place(height=20, x=4, y=77)
@@ -1259,23 +1387,48 @@ class gui_transaction_tab:
 
 		self.entry_change_address=tk.Entry(self.scrollable_frame_tx,width=20,bg="#CCCCEE")
 		self.entry_change_address.pack();self.entry_change_address.place(height=20,width=380, x=70, y=52)
-		#self.entry_change_address.bind("<KeyRelease>", self.checkTxReady);
 
 		self.entry_change_amt=tk.Entry(self.scrollable_frame_tx,textvariable=self.typedChange,state=tk.DISABLED)
 		self.entry_change_amt.pack();self.entry_change_amt.place(height=20,width=75, x=460, y=52)
 		
 
 
-		self.button_tx_ready=tk.Button(self.scrollable_frame_tx,text="Create Transaction",bg="#00469b",fg="#FFFFFF",command=self.createTX, state=tk.DISABLED)
-		self.button_tx_ready.pack()
-		self.button_tx_ready.place(height=20, x=200, y=77)
+		
+
+
+		# frame where you pick how you want to sign a transaction (keypath/scriptpath)
 
 		self.PathContainer=None
 		self.PathValueArray=[]
 		self.PathValueArray2=[]
-		self.selectSigningMethod()#needs to be removed
+		
+		self.containerChooseSigningMethod = tk.LabelFrame(self.root)
+		self.containerChooseSigningMethod.pack()
+		self.containerChooseSigningMethod.place(height=310,width=400, x=610,y=30)
+
+		self.keyPathChosen=True
+
+		self.radio_spendpath=tk.IntVar()
+		self.radio_scriptpath=tk.IntVar()
+
+		text="Spend via KeyPath: Most private and less expensive."
+		self.radio_KeyPath=tk.Radiobutton(self.containerChooseSigningMethod,text=text,variable=self.radio_spendpath,value=1,command=self.initKeyPathSelection)
+		self.radio_KeyPath.pack();self.radio_KeyPath.place(height=20, x=10, y=10)
+
+		text="Spend via ScriptPath: Alternate way if keypath not possible"
+		self.radio_ScriptPath=tk.Radiobutton(self.containerChooseSigningMethod,text=text,variable=self.radio_spendpath,value=2,command=self.initScriptPathSelection)
+		self.radio_ScriptPath.pack();self.radio_ScriptPath.place(height=20, x=10, y=35)
+
+
+
+		self.button_tx_ready=tk.Button(self.root,text="Create Transaction",bg="#00469b",fg="#FFFFFF",command=self.createTX, state=tk.DISABLED)
+		self.button_tx_ready.pack()
+		self.button_tx_ready.place(height=20, x=610, y=345)
 
 		self.selected_balance=0
+		self.largest_selected_blockheight=0
+
+		self.canvas_tx_script=None
 
 	def add_address_field(self,event=None):
 		num_addresses=len(self.entry_address)
@@ -1297,8 +1450,7 @@ class gui_transaction_tab:
 		self.label_change.place(y=52+num_addresses*25)
 		self.entry_change_address.place(y=52+num_addresses*25)
 		self.entry_change_amt.place(y=52+num_addresses*25)
-		self.button_tx_ready.place(y=77+num_addresses*25)
-		self.scrollable_frame_tx.configure(height=num_addresses*25+140)
+		self.scrollable_frame_tx.configure(height=num_addresses*25+115)
 		self.canvas_tx.yview_moveto( 1 )
 
 	def kill_address_field(self,event=None,index=0):
@@ -1324,11 +1476,42 @@ class gui_transaction_tab:
 		self.label_change.place(y=27+num_addresses*25)
 		self.entry_change_address.place(y=27+num_addresses*25)
 		self.entry_change_amt.place(y=27+num_addresses*25)
-		self.button_tx_ready.place(y=52+num_addresses*25)
-		self.scrollable_frame_tx.configure(height=num_addresses*25+140)
+		self.scrollable_frame_tx.configure(height=num_addresses*25+115)
 
 		self.updateFee()
 
+			
+	def update_change_address(self,next_change_index):
+
+		self.next_change_index=next_change_index
+
+		self.next_change_address=config.gl_gui_build_address.taproot_container.TapRootAddress[next_change_index]
+		self.entry_change_address.delete(0, 'end')
+		self.entry_change_address.insert(0,self.next_change_address)
+		print("Change Address: ",self.next_change_address)			
+
+	def update_receive_address(self,next_receive_index):
+		self.next_receive_index=next_receive_index
+
+		self.next_receive_address=config.gl_gui_build_address.taproot_container.TapRootAddress[next_receive_index]
+
+		print("Receive Address: ",self.next_receive_address)
+
+	def is_my_address(self,address):
+		
+		# returns 0 if it's not my address
+		# returns 1 if it's a receive address
+		# returns 2 if it's a change address
+
+		counter=0
+		for tapaddress in config.gl_gui_build_address.taproot_container.TapRootAddress:
+			if(tapaddress==address):
+				if(counter<config.gl_address_generation_max/2):
+					return 1
+				else: return 2
+			counter+=1
+
+		return 0
 	def _bind_canvas_tx_to_mousewheel(self, event):
 		self.canvas_tx.bind_all("<MouseWheel>", self._canvas_tx_mousewheel)
 		self.active_canvas=self.canvas_tx
@@ -1337,20 +1520,26 @@ class gui_transaction_tab:
 		self.canvas_utxo.bind_all("<MouseWheel>", self._canvas_tx_mousewheel)
 		self.active_canvas=self.canvas_utxo
 
+	def _bind_canvas_script_to_mousewheel(self,event):
+		self.canvas_tx_script.bind_all("<MouseWheel>", self._canvas_tx_mousewheel)
+		self.active_canvas=self.canvas_tx_script
+
 	def _unbound_to_mousewheel(self, event):
 		self.canvas_tx.unbind_all("<MouseWheel>")
 		self.canvas_utxo.unbind_all("<MouseWheel>")
+		if(self.canvas_tx_script):self.canvas_tx_script.unbind_all("<MouseWheel>")
 
 	def _canvas_tx_mousewheel(self, event):
 		self.active_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
 	def checkTxReady(self,event=None):
 		self.button_tx_ready.configure(state="normal")
+		use_btc=True if(config.gl_base_unit=="BTC") else False
 
 		if(event is not None):
 			if (event.keycode==17 or event.keycode==16):return#Don't trigger when Shift or Control is released
 		ret=False
-		if(global_.gl_gui_build_address.taproot_container is None):self.button_tx_ready["state"]=tk.DISABLED;ret=True
+		if(config.gl_gui_build_address.taproot_container is None):self.button_tx_ready["state"]=tk.DISABLED;ret=True
 		if(self.selected_balance<=0):self.button_tx_ready["state"]=tk.DISABLED;ret=True
 
 		for i in range(len(self.entry_address)):
@@ -1365,7 +1554,8 @@ class gui_transaction_tab:
 		
 		for i in range(len(self.entry_amount)):
 			try:
-				amt=(float)(self.entry_amount[i].get())
+				amt=(float)(self.entry_amount[i].get())*100000000 if(use_btc) else int(self.entry_amount[i].get())
+				
 			except:
 				self.entry_amount[i].configure(fg="#ff0000")
 				self.button_tx_ready["state"]=tk.DISABLED;return
@@ -1395,79 +1585,108 @@ class gui_transaction_tab:
 		self.button_tx_ready["state"]=tk.NORMAL
 		
 	def update(self,utxo_List):
+		""" This method updates all utxos in 'Create Transaction' window. It creates a checkbox for each UTXO."""
 
-		if(global_.gl_gui_build_address.taproot_container):
-			i=0
-			balance=0
-			self.label_selected.config(text="Selected Coins: 0 BTC")
-			for child in self.scrollable_frame_utxo.winfo_children():
-				child.destroy()
-			del global_.gl_gui_build_address.taproot_container.utxoList[:]
+		if(config.gl_gui_build_address.taproot_container is None):return
 
-			for utxo in utxo_List:
+		balance=0
+
+		blockchain.get_blockheight_from_service()
+
+		text="Selected Coins: 0 BTC" if(config.gl_base_unit=="BTC") else "Selected Coins: 0 Sats"
+		self.label_selected.config(text=text)
+		for child in self.scrollable_frame_utxo.winfo_children():
+			child.destroy()
+
+		old_selected_utxo_list=config.gl_gui_build_address.taproot_container.utxoList.copy()
+
 			
-				address=utxo['address']
-				txId=utxo['txid']
-				outputIndex=utxo['output_n']
-				value=utxo['value']/100000000
-
-				var=tk.IntVar(value=0)
-				new_utxo=(var,utxo)
 				
-				global_.gl_gui_build_address.taproot_container.utxoList.append(new_utxo)
+		del config.gl_gui_build_address.taproot_container.utxoList[:]
+			
+		counter=5
+		for utxo in utxo_List:
 				
-				check_utxo=tk.Checkbutton(self.scrollable_frame_utxo, text=shortenHexString(address)+" : "+shortenHexString(txId)+" ["+str(outputIndex)+"]"+":"+"{:,.8f}".format(value)+" BTC", variable=var,command=self.updateSelected)
-				check_utxo.pack()
-				check_utxo.bind('<Button-3>',make_lambda(str(txId)))
+			address=utxo["address"]
+			txId=""
+			outputIndex=utxo["output_n"]
+			value=utxo["value"]
+			confirms="not confirmed" if(utxo["block_height"] is None) else str(blockchain.block_height-utxo["block_height"]+1)
+			#confirms="To Do"
 
-				balance+=value
-				i=i+1
+			var=tk.IntVar(value=0)
+			new_utxo=(var,utxo)
+				
+			config.gl_gui_build_address.taproot_container.utxoList.append(new_utxo)
+			
+			value_string="{:,.8f}".format(value/100000000)+" BTC" if(config.gl_base_unit=="BTC") else str(value)+" Sats"
+			check_utxo=tk.Checkbutton(self.scrollable_frame_utxo, text=shortenHexString(address)+" : "+value_string+"  Confirms: "+confirms, variable=var,command=self.updateSelected)
+			#check_utxo.pack(side="left")
+			check_utxo.place(x=5,y=counter)
+			counter+=25
+			#check_utxo.bind('<Button-3>',make_lambda(str(txId)))
 
-			self.label_balance.config(text="Total Balance: "+"{:,.8f}".format(balance)+" BTC")
-			self.updateSelected()
+			balance+=value
+			
+		# A new UTXO list is created from scratch so all checkboxes are unchecked again.
+		# This double loop checks if an UTXO is in the old AND new list. It then copies the 'check'/'uncheck' to new checkbox
 
-		
+		for utxo_object_old in old_selected_utxo_list:
+			for utxo_object_new in config.gl_gui_build_address.taproot_container.utxoList:
+				if(utxo_object_old[1]["txid"]==utxo_object_new[1]["txid"] and utxo_object_old[1]["output_n"]==utxo_object_new[1]["output_n"]):
+					utxo_object_new[0].set(utxo_object_old[0].get())
+
+				
+
+		self.scrollable_frame_utxo.configure(height=len(utxo_List)*25)
+		balance_string="{:,.8f}".format(balance/100000000)+" BTC" if(config.gl_base_unit=="BTC") else str(balance)+" Sats"
+		self.label_balance.config(text="Total Balance: "+balance_string)
+		self.updateSelected()
+
+	
 	def updateSelected(self):
+		
 		self.selected_balance=0
-		del global_.gl_gui_build_address.taproot_container.utxoSelected[:]
-		for utxo in global_.gl_gui_build_address.taproot_container.utxoList:
+		self.largest_selected_blockheight=0
+		del config.gl_gui_build_address.taproot_container.utxoSelected[:]
+		for utxo in config.gl_gui_build_address.taproot_container.utxoList:
 			if(utxo[0].get()==1):
-				self.selected_balance+=utxo[1]["value"]/100000000
-				global_.gl_gui_build_address.taproot_container.utxoSelected.append(utxo)
-		self.label_selected.config(text="Selected Coins: "+"{:,.8f}".format(self.selected_balance)+" BTC")
-
+				self.selected_balance+=utxo[1]["value"]
+				config.gl_gui_build_address.taproot_container.utxoSelected.append(utxo)
+				if(self.largest_selected_blockheight is None):pass
+				elif(utxo[1]["block_height"] is None):self.largest_selected_blockheight=None
+				elif(utxo[1]["block_height"]>self.largest_selected_blockheight):self.largest_selected_blockheight=utxo[1]["block_height"]
+		
+		balance_string="{:,.8f}".format(self.selected_balance/100000000)+" BTC" if(config.gl_base_unit=="BTC") else str(self.selected_balance)+" Sats"
+		self.label_selected.config(text="Selected Coins: "+balance_string)
 		self.updateFee(event=None)
+		
 		self.checkTxReady()
+		
+
+		if(self.radio_spendpath.get()==2):
+			for script_container in config.gl_gui_build_address.script_container_array:
+				if(script_container.is_mine):
+					if(script_container.timelock>0 or script_container.timelockDelay>0):
+						
+						blockchain.update_script_locktimes()
+						break
+
 
 	def Container_setActive(self):
 		if(self.radio_keypath.get()==1):
 
-			for i in range (0,len(global_.gl_gui_build_address.script_container_array)):
-				global_.gl_gui_build_address.script_container_array[i].active=False
-				global_.gl_gui_build_address.script_container_array[i].changeColor()
+			for i in range (0,len(config.gl_gui_build_address.script_container_array)):
+				config.gl_gui_build_address.script_container_array[i].active=False
+				config.gl_gui_build_address.script_container_array[i].changeColor()
 		else:
-			for i in range (0,len(global_.gl_gui_build_address.script_container_array)):
-				global_.gl_gui_build_address.script_container_array[i].active=True
-				global_.gl_gui_build_address.script_container_array[i].changeColor()
+			for i in range (0,len(config.gl_gui_build_address.script_container_array)):
+				config.gl_gui_build_address.script_container_array[i].active=True
+				config.gl_gui_build_address.script_container_array[i].changeColor()
 	
 	def selectSigningMethod(self):
 		
-		self.containerChooseSigningMethod = tk.LabelFrame(self.root)
-		self.containerChooseSigningMethod.pack()
-		self.containerChooseSigningMethod.place(height=310,width=400, x=610,y=30)
-
-		self.keyPathChosen=True
-
-		self.radio_spendpath=tk.IntVar()
-		self.radio_scriptpath=tk.IntVar()
-
-		text="Spend via KeyPath: Most private and less expensive."
-		self.radio_KeyPath=tk.Radiobutton(self.containerChooseSigningMethod,text=text,variable=self.radio_spendpath,value=1,command=self.initKeyPathSelection)
-		self.radio_KeyPath.pack();self.radio_KeyPath.place(height=20, x=10, y=10)
-
-		text="Spend via ScriptPath: Alternate way if keypath not possible"
-		self.radio_ScriptPath=tk.Radiobutton(self.containerChooseSigningMethod,text=text,variable=self.radio_spendpath,value=2,command=self.initScriptPathSelection)
-		self.radio_ScriptPath.pack();self.radio_ScriptPath.place(height=20, x=10, y=35)
+		pass
 
 
 		
@@ -1482,52 +1701,68 @@ class gui_transaction_tab:
 		self.PathValueArray=[]
 
 		text=""
-		if(global_.gl_gui_build_address.taproot_container==None):
+		taproot_container=config.gl_gui_build_address.taproot_container
+		if(taproot_container==None):
 			text="Please create a taproot address first"
 			label=tk.Label(self.PathContainer,text=text);label.pack();label.place(height=20,x=4,y=2)
 			return
-		if(global_.gl_gui_build_address.taproot_container.internalKey.is_mine==False):
-			text="You do not own a KeyPath public key."
-			label=tk.Label(self.PathContainer,text=text);label.pack();label.place(height=20,x=4,y=2)
-			return
 
-		if(len(global_.gl_gui_build_address.taproot_container.internalKey.parent_array)==0):
+		if(len(taproot_container.internalKey.parent_array)==0):
 			var=tk.IntVar(value=0)
-			PathValue=[var,global_.gl_gui_build_address.taproot_container.internalKey]
-			label_keys=tk.Checkbutton(self.PathContainer,text="Sign with: "+shortenHexString(str(global_.gl_gui_build_address.taproot_container.internalKey.pubkey)),variable=var,command=self.checkPathSelection)
+			PathValue=[var,taproot_container.internalKey]
+
+			text="Sign with "+taproot_container.internalKey.label0+": "
+			if(taproot_container.internalKey.ext_key is not None):
+				text+=shortenHexString(str(taproot_container.internalKey.ext_key.wif_public()),22,13)
+			else: text+=shortenHexString(str(taproot_container.internalKey.pubkey[0]),22,13)
+			label_keys=tk.Checkbutton(self.PathContainer,text=text,variable=var,command=self.checkPathSelection)
 			label_keys.pack();
-			label_keys.place(height=20,x=4,y=2)
-			label_keys.bind('<Button-3>',lambda x:console.copyText(str(global_.gl_gui_build_address.taproot_container.internalKey.pubkey)))
+			label_keys.place(height=20,x=4,y=22)
+			label_keys.bind('<Button-3>',lambda x:console.copyText(str(taproot_container.internalKey.pubkey)))
+
+			if(taproot_container.internalKey.is_mine==False):
+				text="You do not own a KeyPath public key."
+				label=tk.Label(self.PathContainer,text=text);label.pack();label.place(height=20,x=4,y=2)
+				label_keys.configure(state=tk.DISABLED)
+
 			self.PathValueArray.append(PathValue)
 		
-		if(len(global_.gl_gui_build_address.taproot_container.internalKey.parent_array)>0):
-			text="Your Public Key is part of a multisig. You can create a signature,\nbut also need the signatures of the other keys"
+		if(len(taproot_container.internalKey.parent_array)>0):
+			text=("This is a multisig key. You need a valid signature of all of the keys below.\n"
+				"You can only sign with keys, where you own the private key.")
 			label=tk.Label(self.PathContainer,text=text);label.pack();label.place(height=45,x=4,y=2)
 			
 			var=tk.IntVar()
-			PathValue=[var,global_.gl_gui_build_address.taproot_container.internalKey]
+			PathValue=[var,taproot_container.internalKey]
 			self.PathValueArray.append(PathValue)
 
 			counter=0
-			for i in range(0,len(global_.gl_gui_build_address.taproot_container.internalKey.parent_array)):
+			for i in range(0,len(taproot_container.internalKey.parent_array)):
 				var=tk.IntVar()
-				if(global_.gl_gui_build_address.taproot_container.internalKey.parent_array[i].is_mine):
-					text="Sign with "+global_.gl_gui_build_address.taproot_container.internalKey.parent_array[i].label0+": "+shortenHexString(str(global_.gl_gui_build_address.taproot_container.internalKey.parent_array[i].pubkey))
+				if(taproot_container.internalKey.parent_array[i].is_mine):
+					text=taproot_container.internalKey.parent_array[i].label0+": "
+					if(taproot_container.internalKey.parent_array[i].ext_key is not None):
+						text+=shortenHexString(str(taproot_container.internalKey.parent_array[i].ext_key.wif_public()),24,15)
+					else: text+=shortenHexString(str(taproot_container.internalKey.parent_array[i].pubkey[0]),24,15)
 					chkbutton=tk.Checkbutton(self.PathContainer,text=text,variable=var,command=self.checkPathSelection)
-					chkbutton.bind('<Button-3>',make_lambda(str(global_.gl_gui_build_address.taproot_container.internalKey.parent_array[i].pubkey)))
+					chkbutton.bind('<Button-3>',make_lambda(str(taproot_container.internalKey.parent_array[i].pubkey[0])))
 				else:
-					text="Key of "+global_.gl_gui_build_address.taproot_container.internalKey.parent_array[i].label0+": "+shortenHexString(str(global_.gl_gui_build_address.taproot_container.internalKey.parent_array[i].pubkey))
+					text=taproot_container.internalKey.parent_array[i].label0+": "
+					if(taproot_container.internalKey.parent_array[i].ext_key is not None):
+						text+=shortenHexString(str(taproot_container.internalKey.parent_array[i].ext_key.wif_public()),24,15)
+					else: text+=shortenHexString(str(taproot_container.internalKey.parent_array[i].pubkey[0]),24,15)
 					chkbutton=tk.Checkbutton(self.PathContainer,text=text,state=tk.DISABLED)
-					chkbutton.bind('<Button-3>',make_lambda(str(global_.gl_gui_build_address.taproot_container.internalKey.parent_array[i].pubkey)))
+					chkbutton.bind('<Button-3>',make_lambda(str(taproot_container.internalKey.parent_array[i].pubkey[0])))
 				
-				PathValue=[var,global_.gl_gui_build_address.taproot_container.internalKey.parent_array[i]]
-				chkbutton.pack();chkbutton.place(height=20,x=4,y=52+counter*25)
+				PathValue=[var,taproot_container.internalKey.parent_array[i]]
+				chkbutton.pack();chkbutton.place(height=20,x=4,y=77+counter*25)
 				self.PathValueArray.append(PathValue)
 				counter+=1
 
 		self.checkPathSelection()
 
 	def initScriptPathSelection(self):
+		
 		self.keyPathChosen=False
 		if(self.PathContainer):self.PathContainer.destroy()
 		del self.PathValueArray[:]
@@ -1538,85 +1773,115 @@ class gui_transaction_tab:
 		self.PathValueArray=[]
 		self.PathValueArray2=[]
 
+		self.canvas_tx_script = tk.Canvas(self.PathContainer)#,bg="#00FF00")
+		self.canvas_tx_script.place(height=0,width=0, x=0,y=0)
+		scrollbar = tk.Scrollbar(self.PathContainer, orient="vertical", command=self.canvas_tx_script.yview)
+		self.scrollable_frame_tx_script = tk.Frame(self.canvas_tx_script,width=595,height=160)
+		self.scrollable_frame_tx_script.place(x=0,y=0)
+		
+		
+		self.scrollable_frame_tx_script.bind("<Configure>",lambda e: self.canvas_tx_script.configure(	scrollregion=self.canvas_tx_script.bbox("all")))
+		self.scrollable_frame_tx_script.bind('<Enter>', self._bind_canvas_script_to_mousewheel)
+		self.scrollable_frame_tx_script.bind('<Leave>', self._unbound_to_mousewheel)
+			
+
+		self.canvas_tx_script.create_window(0, 0, window=self.scrollable_frame_tx_script, anchor="w")
+		self.canvas_tx_script.configure(yscrollcommand=scrollbar.set)
+		self.canvas_tx_script.pack(side="left", fill="both", expand=True)
+		scrollbar.pack(side="right", fill="y")
+
+
+
+		
+
 		text=""
-		if(global_.gl_gui_build_address.taproot_container==None):
+		if(config.gl_gui_build_address.taproot_container==None):
 			text="Please create a taproot address first"
-			label=tk.Label(self.PathContainer,text=text);label.pack();label.place(height=20,x=4,y=2)
+			label=tk.Label(self.scrollable_frame_tx_script,text=text);label.pack();label.place(height=20,x=4,y=2)
 			self.checkPathSelection()
 			return
-		if(global_.gl_gui_build_address.taproot_container.merkleRoot==None):
+		if(config.gl_gui_build_address.taproot_container.merkleRoot==None):
 			text="This address has no script path scripts."
-			label=tk.Label(self.PathContainer,text=text);label.pack();label.place(height=20,x=4,y=2)
+			label=tk.Label(self.scrollable_frame_tx_script,text=text);label.pack();label.place(height=20,x=4,y=2)
 			self.checkPathSelection()
 			return
 
 		counter=0
-		counterY=-5
 
 		self.radio_scriptpath=tk.IntVar(value=0)
-		for i in range(0,len(global_.gl_gui_build_address.script_container_array)):
-			if(global_.gl_gui_build_address.script_container_array[i].is_mine):
+		bool_check_blockheight=False
+		blockchain.del_timelock_scripts()
+
+		info_label=tk.Label(self.scrollable_frame_tx_script,text="Select one of the available scripts below.")
+		info_label.pack(anchor="w")
+
+		for i in range(0,len(config.gl_gui_build_address.script_container_array)):
+			script_container=config.gl_gui_build_address.script_container_array[i]
+			
+			if(script_container.is_mine):
+
+				text=script_container.label0
+
+				if(script_container.hash160 is not None):text+=" - Hashlock"
+				if(script_container.timelockDelay>0):text+=" - Rel Timelock: "+str(script_container.timelockDelay)
+				if(script_container.timelock>0):text+=" - Abs Timelock: "+str(script_container.timelock)
 				
-				text="Script "+global_.gl_gui_build_address.script_container_array[i].label0#+": "+shortenHexString(str(global_.gl_gui_build_address.script_container_array[i].script.hex()))
-				#text+="\nSign with pubkey: "+str(global_.gl_gui_build_address.script_container_array[i].parent_array[0].pubkey)
 				
 				var=tk.IntVar()
 				var2=tk.IntVar(value=counter)
-				PathValue1=[var,global_.gl_gui_build_address.script_container_array[i]]
-				PathValue2=[var,var2,global_.gl_gui_build_address.script_container_array[i].parent_array[0]]
-				radiobutton=tk.Radiobutton(self.PathContainer,text=text,variable=self.radio_scriptpath,value=counter,command=self.checkPathSelection)
-				counterY+=5
-				radiobutton.pack();radiobutton.place(height=40,x=4,y=counterY)
-				#radiobutton.bind('<Button-3>',lambda x:console.copyText(str(global_.gl_gui_build_address.script_container_array[i].script.hex())))
-				#radiobutton.bind('<Button-3>',make_lambda(str(global_.gl_gui_build_address.script_container_array[i].script.hex())))
-				counterY+=27
+				PathValue1=[var,script_container]
+				PathValue2=[var,var2,script_container.parent_array[0]]
+				radiobutton=tk.Radiobutton(self.scrollable_frame_tx_script,text=text,variable=self.radio_scriptpath,value=counter,command=self.checkPathSelection)
+
+				if(script_container.timelock>0):
+					blockchain.add_timelock_script(script_container,radiobutton,counter)
+					bool_check_blockheight=True
+				if(script_container.timelockDelay>0):
+					blockchain.add_timelockDelay_script(script_container,radiobutton,counter)
+					bool_check_blockheight=True
+					
+
+				radiobutton.pack(anchor="w");
 				self.PathValueArray.append(PathValue1)
 
-				pubkeyContainer=global_.gl_gui_build_address.script_container_array[i].parent_array[0]
+				pubkeyContainer=script_container.parent_array[0]
 				if(len(pubkeyContainer.parent_array)==0):
-					text="Pubkey "+global_.gl_gui_build_address.script_container_array[i].parent_array[0].label0#+": "+shortenHexString(str(global_.gl_gui_build_address.script_container_array[i].parent_array[0].pubkey))
-					chkbutton=tk.Checkbutton(self.PathContainer,text=text,variable=var,command=self.checkPathSelection)
-					
-					chkbutton.pack();chkbutton.place(height=40,x=14,y=counterY)
-					#chkbutton.bind('<Button-3>',lambda x:console.copyText(str(global_.gl_gui_build_address.script_container_array[i].parent_array[0].pubkey)))
-					#chkbutton.bind('<Button-3>',make_lambda(str(global_.gl_gui_build_address.script_container_array[i].parent_array[0].pubkey)))
-					counterY+=27
 					self.PathValueArray2.append(PathValue2)
+					
 					
 
 				else:
 					counter2=0
 					
 						
-					for o in range (0,len(pubkeyContainer.parent_array)):
-						if(pubkeyContainer.parent_array[o].is_mine):
+					for parent in pubkeyContainer.parent_array:
+						if(parent.is_mine):
 							var=tk.IntVar()
-							PathValue2=[var,var2,pubkeyContainer.parent_array[o]]
-							text="Pubkey "+pubkeyContainer.parent_array[o].label0+": "+shortenHexString(str(pubkeyContainer.parent_array[o].pubkey))
-							chkbutton=tk.Checkbutton(self.PathContainer,text=text,variable=var,command=self.checkPathSelection)
-						
-							chkbutton.pack();chkbutton.place(height=40,x=14,y=counterY)
-							#chkbutton.bind('<Button-3>',lambda x:console.copyText(str(pubkeyContainer.parent_array[o].pubkey)))
-							chkbutton.bind('<Button-3>',make_lambda(str(pubkeyContainer.parent_array[o].pubkey)))
-							counterY+=27
+							PathValue2=[var,var2,parent]
+							
+							chkbutton=tk.Checkbutton(self.scrollable_frame_tx_script,text=parent.label0,variable=var,command=self.checkPathSelection)
+							chkbutton.pack(anchor="w",padx=20)
+							chkbutton.bind('<Button-3>',make_lambda(str(parent.pubkey)))
+
 							self.PathValueArray2.append(PathValue2)
-							counter2+=1
+
 						else:
-							text="Key of "+pubkeyContainer.parent_array[o].label0+": "+shortenHexString(str(pubkeyContainer.parent_array[o].pubkey))
-					
-							chkbutton=tk.Checkbutton(self.PathContainer,text=text,state=tk.DISABLED)
-							chkbutton.pack();chkbutton.place(height=40,x=14,y=counterY)
-							#chkbutton.bind('<Button-3>',lambda x:console.copyText(str(global_.gl_gui_build_address.taproot_container.internalKey.parent_array[o].pubkey)))
-							chkbutton.bind('<Button-3>',make_lambda(str(pubkeyContainer.parent_array[o].pubkey)))
-							counterY+=27
-							counter2+=1
+							chkbutton=tk.Checkbutton(self.scrollable_frame_tx_script,text=parent.label0,state=tk.DISABLED)
+							chkbutton.pack(anchor="w",padx=20)
+							chkbutton.bind('<Button-3>',make_lambda(str(parent.pubkey)))
 				
 				counter+=1
-				
+			else:#I do not own the private key
+				text=script_container.label0+" // Priv key not available"
+				radiobutton=tk.Radiobutton(self.scrollable_frame_tx_script,text=text,variable=self.radio_scriptpath,state=tk.DISABLED)
+				radiobutton.pack(anchor="w")
+
+		if(bool_check_blockheight):blockchain.startThread(blockchain.get_blockheight_from_service)
 
 		if(counter==0):
-			text="You don't own keys that can spend via script path'"
-			label=tk.Label(self.PathContainer,text=text);label.pack();label.place(height=20,x=4,y=2)
+			info_label.configure(text="You don't own keys that can spend via script path")
+
+		blockchain.update_script_locktimes()
 
 		self.checkPathSelection()
 
@@ -1628,15 +1893,16 @@ class gui_transaction_tab:
 		container.label_label0.place(height=15, x=14, y=2)
 
 	def checkPathSelection(self):
-		for i in range(0,len(global_.gl_gui_build_address.pubkey_container_array)):
-			self.removeHighlightContainer(global_.gl_gui_build_address.pubkey_container_array[i])
-		for i in range(0,len(global_.gl_gui_build_address.script_container_array)):
-			self.removeHighlightContainer(global_.gl_gui_build_address.script_container_array[i])
+		for i in range(0,len(config.gl_gui_build_address.pubkey_container_array)):
+			self.removeHighlightContainer(config.gl_gui_build_address.pubkey_container_array[i])
+		for i in range(0,len(config.gl_gui_build_address.script_container_array)):
+			self.removeHighlightContainer(config.gl_gui_build_address.script_container_array[i])
 
 		if(self.radio_spendpath.get()==1 and len(self.PathValueArray)>0):#If KeyPath radio button is selected and keypath possible
 			#If first key does not have parents, it is a single interal key. Check it automatically
 			if(len(self.PathValueArray[0][1].parent_array)==0):
-					self.PathValueArray[0][0].set(1)
+					if(self.PathValueArray[0][1].is_mine):self.PathValueArray[0][0].set(1)
+					else: self.PathValueArray[0][0].set(0)
 					self.setHighlightContainer(self.PathValueArray[0][1])#hightlight multisig key
 			
 			else:#Search for selected checkboxes and hightlight the container + MultiSig
@@ -1644,17 +1910,6 @@ class gui_transaction_tab:
 				for i in range(0,len(self.PathValueArray)):
 					if(self.PathValueArray[i][0].get()==1):
 						self.setHighlightContainer(self.PathValueArray[i][1])
-						
-			#If just one key is available, check if it is a multisig
-			
-			#	if(len(self.PathValueArray[0][1].parent_array)==0):
-			#		self.PathValueArray[0][0].select()
-			#		self.PathValueArray[0][1].highlightContainer.place(height=15, x=105, y=2,width=85)#hightlight multisig key
-			#	else: 
-			#for i in range(0,len(self.PathValueArray)):
-			#	if(self.PathValueArray[i][0].get()==1):
-			#		self.PathValueArray[i][1].highlightContainer.place(height=15, x=105, y=2,width=85)
-				
 
 		if(self.radio_spendpath.get()==2):#If ScriptPath radio button is selected
 			radio=self.radio_scriptpath.get()
@@ -1679,17 +1934,15 @@ class gui_transaction_tab:
 						if(self.PathValueArray2[i][0].get()==1):
 							self.setHighlightContainer(self.PathValueArray2[i][2])#hightlight pubkey of MuSig
 						
-					else: self.PathValueArray2[i][0].set(0)
+					else:self.PathValueArray2[i][0].set(0)
 				if(counter==1):#You own one key of the MultiSig
 					for i in range(0,len(self.PathValueArray2)):
 						if(self.PathValueArray2[i][1].get()==radio):
 							self.PathValueArray2[i][0].set(1)
 							self.setHighlightContainer(self.PathValueArray2[i][2])#hightlight multisig key
 				
-				
-		#self.highlightContainer.place_forget()
-		#self.highlightContainer.place(height=15, x=105, y=2,width=85)
 		self.checkTxReady()
+
 
 	def updateFee(self,event=None):
 		self.entry_fee.delete(0, 'end')
@@ -1697,10 +1950,11 @@ class gui_transaction_tab:
 		self.entry_change_amt.delete(0, 'end')
 
 		total_amt=0
+		use_btc=True if(config.gl_base_unit=="BTC") else False
 
 		for i in range(len(self.entry_amount)):
 			try:
-				amt=(float)(self.entry_amount[i].get())
+				amt=(float)(self.entry_amount[i].get())*100000000 if(use_btc) else (int)(self.entry_amount[i].get())
 			except:
 				self.entry_amount[i].configure(fg="#ff0000")
 				self.button_tx_ready["state"]=tk.DISABLED;return False
@@ -1711,9 +1965,9 @@ class gui_transaction_tab:
 			else:self.entry_amount[i].configure(fg="#000000")
 			total_amt=total_amt+amt
 		
-		fee=(round(self.selected_balance-total_amt, 8))
+		fee=self.selected_balance-total_amt
 		
-		if((float)(fee)<=0):
+		if(fee<=0):
 			for entry_field in self.entry_amount:
 				entry_field.configure(fg="#ff0000")
 			self.button_tx_ready["state"]=tk.DISABLED;return False
@@ -1722,16 +1976,21 @@ class gui_transaction_tab:
 			for entry_field in self.entry_amount:
 				entry_field.configure(fg="#000000")
 
-		suggested_fee=0.000004
-		if((float)(fee)<=suggested_fee):
-			self.entry_fee.insert(0,"{:,.8f}".format(fee))
+		suggested_fee=400
+		if(fee<=suggested_fee):
+			self.entry_fee.insert(0,"{:,.8f}".format(fee/100000000)) if(use_btc) else self.entry_fee.insert(0,fee)
 			self.entry_change_amt.insert(0,"0")
 			self.entry_change_amt.configure(state='disabled')
 			self.checkTxReady()
 			return True
-		change=(round(fee-suggested_fee, 8))
-		self.entry_fee.insert(0,"{:,.8f}".format(suggested_fee))
-		self.entry_change_amt.insert(0,"{:,.8f}".format(change))
+		change=fee-suggested_fee
+
+		if(use_btc):
+			self.entry_fee.insert(0,"{:,.8f}".format(suggested_fee/100000000))
+			self.entry_change_amt.insert(0,"{:,.8f}".format(change/100000000))
+		else:
+			self.entry_fee.insert(0,suggested_fee)
+			self.entry_change_amt.insert(0,change)
 		self.entry_change_amt.configure(state='disabled')
 
 		self.checkTxReady()
@@ -1739,10 +1998,12 @@ class gui_transaction_tab:
 		
 
 	def updateChange(self,event):
+		use_btc=True if(config.gl_base_unit=="BTC") else False
 		self.entry_change_amt.configure(state='normal')
 		self.entry_change_amt.delete(0, 'end')
 		try:
-			fee=(float)(self.typedFee.get())
+			fee=(float)(self.typedFee.get())*100000000 if(use_btc) else (int)(self.typedFee.get())
+			
 		except:
 			self.entry_change_amt.insert(0,"invalid input")
 			self.entry_change_amt.configure(state='disabled')
@@ -1752,13 +2013,13 @@ class gui_transaction_tab:
 
 		for entry_field in self.entry_amount:
 			try:
-				amt=(float)(entry_field.get())
+				amt=(float)(entry_field.get())*100000000 if(use_btc) else (int)(entry_field.get())
 			except:
 				self.entry_fee.insert(0,"invalid input")
 				return False
 
-		suggested_fee=0.000001
-		if((float)(fee)<suggested_fee):
+		suggested_fee=100
+		if(fee<suggested_fee):
 			self.entry_change_amt.insert(0,"Fee too small")
 			self.entry_change_amt.configure(state='disabled')
 			self.entry_fee.configure(fg="#ff0000");self.button_tx_ready["state"]=tk.DISABLED;ret=True;
@@ -1766,7 +2027,7 @@ class gui_transaction_tab:
 		else:self.entry_fee.configure(fg="#000000")
 
 
-		change=(round(self.selected_balance-amt-fee, 8))
+		change=self.selected_balance-amt-fee
 
 		if(change<0):
 			self.entry_change_amt.insert(0,"not enough funds")
@@ -1775,7 +2036,7 @@ class gui_transaction_tab:
 			return False
 		else:self.entry_fee.configure(fg="#000000")
 
-		self.entry_change_amt.insert(0,"{:,.8f}".format(change))
+		self.entry_change_amt.insert(0,"{:,.8f}".format(change/100000000)) if(use_btc) else self.entry_change_amt.insert(0,change)
 		self.entry_change_amt.configure(state='disabled')
 
 		self.checkTxReady()
@@ -1783,14 +2044,16 @@ class gui_transaction_tab:
 
 	def get_destinationList(self):#creates a list of addresses that receive funds in the tx
 		destination_list=[]
+		use_btc=True if(config.gl_base_unit=="BTC")else False
 
 		for i in range(len(self.entry_address)):
-			
-			destination=[self.entry_address[i].get(),(float)(self.entry_amount[i].get())]
+			amount=(float)(self.entry_amount[i].get())*100000000 if(use_btc) else (int)(self.entry_amount[i].get())
+			destination=[self.entry_address[i].get(),amount]
 			destination_list.append(destination)
 
 		if((float)(self.typedChange.get())>0):#Create Change Output
-				destination_list.append([self.entry_change_address.get(),(float)(self.typedChange.get())])
+			amount=(float)(self.typedChange.get())*100000000 if(use_btc) else (int)(self.typedChange.get())
+			destination_list.append([self.entry_change_address.get(),amount])
 
 		return destination_list
 
@@ -1823,18 +2086,25 @@ class gui_transaction_tab:
 
 	def broadcastTX(self,tx):
 		
-		
-
-		res=global_.gl_gui_service.sendrawtransaction(rawtx=tx)
-		if(res==False):
-			global_.gl_console.printText(text="\nError when broadcasting tx. No response",keepOld=True)
-			return
-
-		
-		#a=res['response_dict']
+		res=[]
+		try:
+			network="bitcoin" if config.gl_mainnet else "testnet"
+			srv=bitcoinlib.services.services.Service(network=network)#,cache_uri="D:/Robin/Programmieren/Taproot/GitHub/bitcoinlib/data/database.txt")
+			res=srv.sendrawtransaction(rawtx=tx)
+			if(res==False):
+				config.gl_console.printText(text="\nError when broadcasting tx. No response",keepOld=True)
+				return
+		except:
+			config.gl_console.printText(text="\nError when broadcasting tx. Unknown response",keepOld=True)
+			
 		if "txid" in res:
-			global_.gl_console.printText(text="\nTx ID: "+res['txid'],keepOld=True)
-		else: global_.gl_console.printText(text="\nError when broadcasting tx. Unknown response",keepOld=True)
+			config.gl_console.printText(text="\nTx ID: "+res['txid'],keepOld=True)
+			
+			thread=Thread(target=blockchain.update_balance_by_txid,args=(res['txid'],))
+			thread.start()
+				
+
+		else: config.gl_console.printText(text="\nError when broadcasting tx. Unknown response",keepOld=True)
 		
 
 
@@ -1843,17 +2113,18 @@ class gui_transaction_tab:
 		if(self.keyPathChosen):
 			if(len(self.PathValueArray)==1):#KeyPath Single Key
 				privkey_list=[]
-				for utxo in global_.gl_gui_build_address.taproot_container.utxoList:
+				for utxo in config.gl_gui_build_address.taproot_container.utxoList:
 					if(utxo[0].get()==1):
-						address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
-						privkey_list.append(global_.gl_gui_build_address.taproot_container.tweaked_privkey[address_index])
-				tx=taproot.SpendTransactionViaKeyPath(global_.gl_gui_build_address.taproot_container,privkey_list,self.get_destinationList())
-				global_.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
+						address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
+						privkey_list.append(config.gl_gui_build_address.taproot_container.tweaked_privkey[address_index])
+				tx=taproot.SpendTransactionViaKeyPath(config.gl_gui_build_address.taproot_container,privkey_list,self.get_destinationList())
+				config.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
+				pub=config.gl_gui_build_address.taproot_container.tweakedPubkey[0]
 				self.broadcastWindow(tx)
 
 			if(len(self.PathValueArray)>1):#KeyPath MultiSig
 				
-				self.multisigContainer(multisig_key=global_.gl_gui_build_address.taproot_container.internalKey)
+				self.multisigContainer(multisig_key=config.gl_gui_build_address.taproot_container.internalKey)
 			return
 
 		#ScriptPath chosen
@@ -1870,21 +2141,21 @@ class gui_transaction_tab:
 			hash_160=hash160(self.tx_scriptContainer.hash160_preimage.encode())
 
 			if(hash_160!=self.tx_scriptContainer.hash160):
-				global_.gl_console.printText(text="Your input does not hash to the desired value")
+				config.gl_console.printText(text="Your input does not hash to the desired value")
 				return
 
 		if(len(pubContainer.parent_array)==0):#If Pubkey has no parent, it is not a multisig
 			privkey_list=[]
 			script_list=[]
-			for utxo in global_.gl_gui_build_address.taproot_container.utxoList:
+			for utxo in config.gl_gui_build_address.taproot_container.utxoList:
 				if(utxo[0].get()==1):
-					address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
+					address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
 					if(len(pubContainer.privkey)==1):address_index=0
 					privkey_list.append(pubContainer.privkey[address_index])
 					script_list.append(self.tx_scriptContainer.script[address_index])
-			tx=taproot.SpendTransactionViaScriptPath(global_.gl_gui_build_address.taproot_container,self.get_destinationList(),privkey_list,
+			tx=taproot.SpendTransactionViaScriptPath(config.gl_gui_build_address.taproot_container,self.get_destinationList(),privkey_list,
 							script_list,self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock,self.tx_scriptContainer.hash160_preimage)
-			global_.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
+			config.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
 			self.broadcastWindow(tx)
 			return
 
@@ -1895,14 +2166,14 @@ class gui_transaction_tab:
 	def multisigContainer(self,multisig_key):
 		self.tx_multisigkey=multisig_key
 
-		tx_inputs=len(global_.gl_gui_build_address.taproot_container.utxoSelected)
+		tx_inputs=len(config.gl_gui_build_address.taproot_container.utxoSelected)
 		self.cMultiSig=[]
 		del self.cMultiSig[:]
 
-		for utxo in global_.gl_gui_build_address.taproot_container.utxoSelected:
+		for utxo in config.gl_gui_build_address.taproot_container.utxoSelected:
 			tweak_=None
-			address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
-			if(self.keyPathChosen):tweak_=global_.gl_gui_build_address.taproot_container.tapTweak_bytes[address_index]
+			address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
+			if(self.keyPathChosen):tweak_=config.gl_gui_build_address.taproot_container.tapTweak_bytes[address_index]
 			
 			self.cMultiSig.append(c_MultiSig(self.tx_multisigkey.pubkey[address_index],tweak=tweak_))
 		
@@ -1965,8 +2236,8 @@ class gui_transaction_tab:
 					self.entry_NonceHash.append(entry_Label)
 
 			for a in range(0,tx_inputs):
-				utxo=global_.gl_gui_build_address.taproot_container.utxoSelected[a]
-				address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
+				utxo=config.gl_gui_build_address.taproot_container.utxoSelected[a]
+				address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
 
 				for i in range(1,len(self.PathValueArray)):
 					
@@ -2004,7 +2275,7 @@ class gui_transaction_tab:
 					if(checked[o]==key):
 						for a in range(0,tx_inputs):
 							if(len(key.privkey)>1):
-								address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(global_.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
+								address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(config.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
 								self.cMultiSig[a].addPrivKey(key.privkey[address_index])
 							else: self.cMultiSig[a].addPrivKey(key.privkey[0])
 						mine=True
@@ -2012,7 +2283,7 @@ class gui_transaction_tab:
 					for a in range(0,tx_inputs):
 						
 						if(len(key.pubkey)>1):
-							address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(global_.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
+							address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(config.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
 							self.cMultiSig[a].addPubKey(key.pubkey[address_index])
 						else: self.cMultiSig[a].addPubKey(key.pubkey[0])
 
@@ -2025,7 +2296,7 @@ class gui_transaction_tab:
 					entry_Label.place(height=20,width=450, x=100, y=30+i*30);entry_Label.delete(0, 'end');
 					for a in range(0,tx_inputs):
 						if(len(key.pubkey)>1):
-							address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(global_.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
+							address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(config.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
 							nonce=self.cMultiSig[a].getNonce(key.pubkey[address_index])
 						else: nonce=self.cMultiSig[a].getNonce(key.pubkey[0])
 						if(nonce):entry_Label.insert(tk.END,str(test_framework.sha256(nonce.get_pubkey().get_bytes()).hex()))
@@ -2044,27 +2315,27 @@ class gui_transaction_tab:
 			if(self.keyPathChosen):
 				for a in range(0,tx_inputs):
 					priv_list.append(self.cMultiSig[a].getTweakedPrivateKey())
-				#global_.gl_gui_build_address.taproot_container.tweaked_privkey=priv_list
-				tx=taproot.SpendTransactionViaKeyPath(global_.gl_gui_build_address.taproot_container,priv_list,self.get_destinationList(),address_index_from_short_list=True)
-				global_.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
+				#config.gl_gui_build_address.taproot_container.tweaked_privkey=priv_list
+				tx=taproot.SpendTransactionViaKeyPath(config.gl_gui_build_address.taproot_container,priv_list,self.get_destinationList(),address_index_from_short_list=True)
+				config.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
 				self.broadcastWindow(tx)
 			else:
 				for a in range(0,tx_inputs):
 					priv_list.append(self.cMultiSig[a].getInternalPrivateKey())
 				script_list=[]
-				for utxo in global_.gl_gui_build_address.taproot_container.utxoList:
+				for utxo in config.gl_gui_build_address.taproot_container.utxoList:
 					if(utxo[0].get()==1):
-						address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
+						address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(utxo[1]['address'])
 						script_list.append(self.tx_scriptContainer.script[address_index])
-				tx=taproot.SpendTransactionViaScriptPath(global_.gl_gui_build_address.taproot_container,self.get_destinationList(),priv_list,
+				tx=taproot.SpendTransactionViaScriptPath(config.gl_gui_build_address.taproot_container,self.get_destinationList(),priv_list,
 							script_list,self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock,self.tx_scriptContainer.hash160_preimage)
-				global_.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
+				config.gl_console.printText(text="Signed Raw Transaction:\n"+str(tx))
 				self.broadcastWindow(tx)
 			return
 
 		
 	def multisig_page2(self):
-		tx_inputs=len(global_.gl_gui_build_address.taproot_container.utxoSelected)
+		tx_inputs=len(config.gl_gui_build_address.taproot_container.utxoSelected)
 
 		for i in range(0,len(self.entry_NonceHash)):
 			if(self.cMultiSig[0].getNonce(self.cMultiSig[0].keys[i][1]) is not None):
@@ -2073,12 +2344,12 @@ class gui_transaction_tab:
 
 			try:int(self.entry_NonceHash[i].get(),16)
 			except:
-				global_.gl_console.printText("Enter all your partners nonce hashes before proceeding")
+				config.gl_console.printText("Enter all your partners nonce hashes before proceeding")
 				return
 			input_=self.entry_NonceHash[i].get()
 			input_length=len(input_)
 			if(input_length!=tx_inputs*64):
-				global_.gl_console.printText("You must insert "+str(tx_inputs)+" hashes of 64 hex chars each without spaces")
+				config.gl_console.printText("You must insert "+str(tx_inputs)+" hashes of 64 hex chars each without spaces")
 				return
 
 			for a in range(tx_inputs):
@@ -2108,7 +2379,7 @@ class gui_transaction_tab:
 				for o in range(0,len(self.tx_multisigkey.parent_array)):
 					for a in range(tx_inputs):
 						if(len(self.tx_multisigkey.parent_array[o].pubkey)>1):
-							address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(global_.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
+							address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(config.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
 						else: address_index=0
 						if(self.tx_multisigkey.parent_array[o].pubkey[address_index]==self.cMultiSig[a].keys[i][1]):
 							label=tk.Label(self.page2,text =self.tx_multisigkey.parent_array[o].label0)
@@ -2139,20 +2410,14 @@ class gui_transaction_tab:
 
 	def button3(self):
 		self.multisig_page3(1)
-	#hash cbf76bb7c511d3135e180d66a6a2d5e9d00a33e313fdf78465a675ff05c31f6d
-	 #    19aae63e2ab99af3dccc80cd5d3d59ee6d37694971c9ac42c81c57586b8492fc
-
-	#Alice hash	
-	#	 9d4fd5c8826b822b2b5cf69cc5581cef136c4ec2baaba8a0be18080492848a0e
-	#	 c0e8238c6e141f408d7cab6a397d25dec8b0dd513b7dee010386365fee9c9cb0
 	     
 	def multisig_page3(self,value):
-		tx_inputs=len(global_.gl_gui_build_address.taproot_container.utxoSelected)
+		tx_inputs=len(config.gl_gui_build_address.taproot_container.utxoSelected)
 		
 		for i in range(0,len(self.entry_NoncePub)):
 			try:int(self.entry_NoncePub[i].get(),16)
 			except:
-				global_.gl_console.printText("Enter all your partners nonce pubkeys before proceeding")
+				config.gl_console.printText("Enter all your partners nonce pubkeys before proceeding")
 				return
 
 		if(value==1):self.page2.place_forget()
@@ -2162,7 +2427,7 @@ class gui_transaction_tab:
 			input_=self.entry_NoncePub[i].get()
 
 			if(len(input_)!=tx_inputs*64):
-				global_.gl_console.printText("You must insert "+str(tx_inputs)+" hashes of 64 hex chars each without spaces")
+				config.gl_console.printText("You must insert "+str(tx_inputs)+" hashes of 64 hex chars each without spaces")
 				return
 
 			for a in range(tx_inputs):
@@ -2171,11 +2436,11 @@ class gui_transaction_tab:
 					if(val==1):
 						pass
 					elif (val==2):
-						global_.gl_console.printText("ERROR: "+str(input_[a*64:(a+1)*64])+" is no valid nonce")
+						config.gl_console.printText("ERROR: "+str(input_[a*64:(a+1)*64])+" is no valid nonce")
 						self.windowMultiSig.destroy()
 						return
 					elif (val==3):
-						global_.gl_console.printText("ERROR: Hash of "+str(input_[a*64:(a+1)*64])+" does not match the hash you entered earlier")
+						config.gl_console.printText("ERROR: Hash of "+str(input_[a*64:(a+1)*64])+" does not match the hash you entered earlier")
 						self.windowMultiSig.destroy()
 						return
 
@@ -2193,22 +2458,21 @@ class gui_transaction_tab:
 			self.cMultiSig[a].genAggregateNonce()
 			self.cMultiSig[a].genAggregatePubkey()
 		
-		if(self.keyPathChosen):self.spending_tx,input_tx=taproot.createUnsignedTX(global_.gl_gui_build_address.taproot_container,self.get_destinationList())
-		else: self.spending_tx,input_tx=taproot.createUnsignedTX(global_.gl_gui_build_address.taproot_container,self.get_destinationList(),self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock)
+		if(self.keyPathChosen):self.spending_tx,input_tx=taproot.createUnsignedTX(config.gl_gui_build_address.taproot_container,self.get_destinationList())
+		else: self.spending_tx,input_tx=taproot.createUnsignedTX(config.gl_gui_build_address.taproot_container,self.get_destinationList(),self.tx_scriptContainer.timelockDelay,self.tx_scriptContainer.timelock)
 
 
 		if(value==2):del self.signature_pool[:]
 		self.signature_pool=[]
 		self.signature_entry=[]
 		self.sighash_list=None
-		#self.witness_elements=None
 		allsSigsAvailable=True
 		for i in range(0,len(self.cMultiSig[0].keys)+1):
 			if(i==len(self.cMultiSig[0].keys)):
 				if(self.keyPathChosen):
 					signature_list=[]
 					for a in range(tx_inputs):
-						sig,self.sighash_list=taproot.signMultiSig(global_.gl_gui_build_address.taproot_container,self.spending_tx,input_tx,self.cMultiSig[a],-1,input_tx_counter=a)
+						sig,self.sighash_list=taproot.signMultiSig(config.gl_gui_build_address.taproot_container,self.spending_tx,input_tx,self.cMultiSig[a],-1,input_tx_counter=a)
 						signature_list.append(sig)
 					self.signature_pool.append(signature_list)
 
@@ -2218,12 +2482,12 @@ class gui_transaction_tab:
 			else:
 					signature_list=[]
 					for a in range(tx_inputs):
-						if(self.keyPathChosen):sig,self.sighash_list=taproot.signMultiSig(global_.gl_gui_build_address.taproot_container,self.spending_tx,input_tx,self.cMultiSig[a],i,input_tx_counter=a)
+						if(self.keyPathChosen):sig,self.sighash_list=taproot.signMultiSig(config.gl_gui_build_address.taproot_container,self.spending_tx,input_tx,self.cMultiSig[a],i,input_tx_counter=a)
 						else:
 							if(len(self.tx_scriptContainer.script)>1):
-								address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(global_.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
+								address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(config.gl_gui_build_address.taproot_container.utxoSelected[a][1]['address'])
 							else:address_index=0
-							sig,self.sighash_list=taproot.signMultiSig(global_.gl_gui_build_address.taproot_container,self.spending_tx,input_tx,self.cMultiSig[a],i,self.tx_scriptContainer.script[address_index],input_tx_counter=a)
+							sig,self.sighash_list=taproot.signMultiSig(config.gl_gui_build_address.taproot_container,self.spending_tx,input_tx,self.cMultiSig[a],i,self.tx_scriptContainer.script[address_index],input_tx_counter=a)
 						
 						signature_list.append(sig)
 
@@ -2269,7 +2533,7 @@ class gui_transaction_tab:
 			button_next.place(x=100,y=30+len(self.cMultiSig[0].keys)*60)
 
 	def combineSignatures(self):
-		#tx_inputs=len(global_.gl_gui_build_address.taproot_container.utxoSelected)
+		#tx_inputs=len(config.gl_gui_build_address.taproot_container.utxoSelected)
 
 		#for a in range(tx_inputs):
 			for i in  range(0,len(self.cMultiSig[0].keys)):
@@ -2283,7 +2547,7 @@ class gui_transaction_tab:
 						try:
 							int(sig[i],16)
 						except:
-							global_.gl_console.printText("Enter all your partners signatures before proceeding")
+							config.gl_console.printText("Enter all your partners signatures before proceeding")
 							return
 						sig[i]=int(sig[i])
 					self.signature_pool.append(sig)
@@ -2300,9 +2564,9 @@ class gui_transaction_tab:
 				else:
 					
 					if(len(self.tx_scriptContainer.script)>1):
-						address_index=global_.gl_gui_build_address.taproot_container.get_index_of_address(global_.gl_gui_build_address.taproot_container.utxoSelected[i][1]['address'])
+						address_index=config.gl_gui_build_address.taproot_container.get_index_of_address(config.gl_gui_build_address.taproot_container.utxoSelected[i][1]['address'])
 					else: address_index=0
-					control_map=global_.gl_gui_build_address.taproot_container.taptree[address_index][2]
+					control_map=config.gl_gui_build_address.taproot_container.taptree[address_index][2]
 					script=self.tx_scriptContainer.script[address_index]
 					self.spending_tx.wit.vtxinwit.append(test_framework.CTxInWitness([sig_agg,script,control_map[script]]))
 
@@ -2319,19 +2583,11 @@ class gui_transaction_tab:
 			label.pack()
 			label.place(height=20, x=10, y=70+num*60)
 
-			#print(rawtxs[0])
-			
-			#siglabel1=slice(0,len(str(rawtxs[0]))//2)
-			#siglabel2=slice(len(str(rawtxs[0]))//2,len(str(rawtxs[0])))
-			#entry_Label=tk.Entry(self.page3);entry_Label.pack()
-			#entry_Label.place(height=80,width=450, x=100, y=30+num*90);entry_Label.delete(0, 'end');
-			#entry_Label.insert(0,str(rawtxs[0])[siglabel1]+"\n"+str(rawtxs[0])[siglabel2])
-
 			entry_Label=tk.Text(self.page3);entry_Label.pack()
 			entry_Label.place(height=80,width=500, x=100, y=70+num*60);entry_Label.delete(1.0, 'end');
 			entry_Label.insert(1.0,str(rawtxs[0]))
 
-			global_.gl_console.printText(text="Signed Raw Transaction\n"+str(rawtxs[0]))
+			config.gl_console.printText(text="Signed Raw Transaction\n"+str(rawtxs[0]))
 
 			button_sendTX=tk.Button(self.page3,text="Send Transaction", command=lambda: self.broadcastTX(rawtxs[0]),bg="#00cc44",fg="#000000")
 			button_sendTX.pack()

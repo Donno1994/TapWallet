@@ -1,9 +1,9 @@
 import tkinter as tk
-import global_
+import config
 
 class Console:
 	def __init__(self):
-		self.root=global_.gl_gui.root
+		self.root=config.gl_gui.root
 		self.textArea=tk.Text(self.root,font=('arial',11, 'italic'))
 		self.textArea.pack()
 		self.textArea.place(height=310,width=450, x=1015,y=52)

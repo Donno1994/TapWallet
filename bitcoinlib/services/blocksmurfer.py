@@ -54,29 +54,30 @@ class BlocksmurferClient(BaseClient):
             balance += res['balance']
         return balance
 
-    def getutxos(self, address, after_txid='', limit=MAX_TRANSACTIONS):
-        res = self.compose_request('utxos', address, variables={'after_txid': after_txid})
-        block_count = self.blockcount()
-        utxos = []
-        for u in res:
-            block_height = None if not u['block_height'] else u['block_height']
-            confirmations = u['confirmations']
-            if block_height and not confirmations:
-                confirmations = block_count - block_height
-            utxos.append({
-                'address': address,
-                'txid': u['tx_hash'],
-                'confirmations': confirmations,
-                'output_n': u['output_n'],
-                'input_n': u['input_n'],
-                'block_height': block_height,
-                'fee': u['fee'],
-                'size': u['size'],
-                'value': u['value'],
-                'script': u['script'],
-                'date': datetime.strptime(u['date'][:19], "%Y-%m-%dT%H:%M:%S")
-            })
-        return utxos[:limit]
+    # TODO: fix blocksmurfer api
+    # def getutxos(self, address, after_txid='', limit=MAX_TRANSACTIONS):
+    #     res = self.compose_request('utxos', address, variables={'after_txid': after_txid})
+    #     block_count = self.blockcount()
+    #     utxos = []
+    #     for u in res:
+    #         block_height = None if not u['block_height'] else u['block_height']
+    #         confirmations = u['confirmations']
+    #         if block_height and not confirmations:
+    #             confirmations = block_count - block_height
+    #         utxos.append({
+    #             'address': address,
+    #             'txid': u['txid'],
+    #             'confirmations': confirmations,
+    #             'output_n': u['output_n'],
+    #             'input_n': u['input_n'],
+    #             'block_height': block_height,
+    #             'fee': u['fee'],
+    #             'size': u['size'],
+    #             'value': u['value'],
+    #             'script': u['script'],
+    #             'date': datetime.strptime(u['date'][:19], "%Y-%m-%dT%H:%M:%S")
+    #         })
+    #     return utxos[:limit]
 
     def _parse_transaction(self, tx, block_count=None):
         block_height = None if not tx['block_height'] else tx['block_height']
@@ -103,10 +104,10 @@ class BlocksmurferClient(BaseClient):
                         encoding=ti['encoding'], unlocking_script_unsigned=ti['script_code'],
                         sigs_required=ti['sigs_required'], sequence=ti['sequence'],
                         witnesses=[bytes.fromhex(w) for w in ti['witnesses']], script_type=ti['script_type'],
-                        strict=False)
+                        strict=self.strict)
         for to in tx['outputs']:
             t.add_output(value=to['value'], address=to['address'], public_hash=to['public_hash'],
-                         lock_script=to['script'], spent=to['spent'], strict=False)
+                         lock_script=to['script'], spent=to['spent'], strict=self.strict)
         t.update_totals()
         return t
 
