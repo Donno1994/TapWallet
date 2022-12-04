@@ -100,7 +100,9 @@ def save_wallet(promt_confirmation=False):
 
 	else:
 	
-		data+="<config>"+config.gl_base_unit+"<config_end>"
+		data+="<baseunit>"+config.gl_base_unit+"<baseunit_end>"
+		data+="<autoupdate>"+str(config.gl_auto_update_time)+"<autoupdate_end>"
+		data+="<gaplimit>"+str(config.gl_gap_limit)+"<gaplimit_end>"
 
 		data+="<blockheight>"+str(blockchain.block_height)+"<blockheight_end>"
 
@@ -292,8 +294,14 @@ def read_next_object(object_):
 	data=object_[index_end+1:end_of_data-1]
 		
 
-	if(type_of_data=="config"):
+	if(type_of_data=="baseunit"):
+		print(data)
 		config.gl_base_unit=data
+	elif(type_of_data=="autoupdate"):
+		print(data)
+		config.gl_auto_update_time=int(data)
+	elif(type_of_data=="gaplimit"):
+		config.gl_gap_limit=int(data)
 
 	elif(type_of_data=="blockheight"):
 		print("Blockheight from cache ",data)
