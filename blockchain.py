@@ -215,11 +215,15 @@ def check_gap_limit():
 		# Get indexes of desired receive addresses and check for tx updates with service provider.
 		# Change addresses are not updated. Next change address already updated in check_hot_addresses()
 		
-		first_index=config.gl_gui_transaction_tab.next_receive_index
-		last_index=first_index+config.gl_gap_limit-1
+		
+		last_index=config.gl_gui_transaction_tab.next_receive_index+config.gl_gap_limit
+		if(last_index>=config.gl_address_generation_max/2):
+			last_index=int(config.gl_address_generation_max/2)-1
 
-		for index in range(first_index+1,last_index): # +1 because next_receive_index is checked by hot addresses
+		for index in range(0,last_index+1):
 
+			if(index==config.gl_gui_transaction_tab.next_receive_index):
+				continue #already checked in check_hot_addresses()
 			address=config.gl_gui_build_address.taproot_container.TapRootAddress[index]
 			key=config.gl_wallet.key(address)
 			config.gl_wallet.transactions_update(key_id=key.key_id)

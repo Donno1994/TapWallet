@@ -213,7 +213,7 @@ class class_gui():
 		label_base_unit.grid(row=0,column=0,sticky="w")
 
 		self.base_unit = tk.StringVar()
-		self.base_unit.set("Sats") # default value
+		self.base_unit.set(config.gl_base_unit) # default value
 
 		w = tk.OptionMenu(config_window, self.base_unit, "BTC", "Sats",command=self.apply_config)
 		w.grid(row=0,column=1,sticky="w")
@@ -224,8 +224,14 @@ class class_gui():
 		label_update_balance=tk.Label(config_window,text="Sync balance automatically")
 		label_update_balance.grid(row=1,column=0,sticky="w")
 
+		time="Off"
+		if(config.gl_auto_update_time==60):time="Every 1 min"
+		if(config.gl_auto_update_time==120):time="Every 2 min"
+		if(config.gl_auto_update_time==300):time="Every 5 min"
+		if(config.gl_auto_update_time==600):time="Every 10 min"
+
 		self.auto_update_time = tk.StringVar()
-		self.auto_update_time.set("Every 1 min") # default value
+		self.auto_update_time.set(time) # default value
 
 		options=("Off","Every 1 minute","Every 2 minutes","Every 5 minutes","Every 10 minutes")
 		w = tk.OptionMenu(config_window, self.auto_update_time, *options,command=self.apply_config)
@@ -234,12 +240,12 @@ class class_gui():
 		## Gap Limit
 
 		label_gap_limit=tk.Label(config_window,text="Gap limit")
-		label_update_balance.grid(row=2,column=0,sticky="w")
+		label_gap_limit.grid(row=2,column=0,sticky="w")
 
 		self.gap_limit=tk.IntVar()
-		self.gap_limit.set(5)
+		self.gap_limit.set(config.gl_gap_limit)
 
-		options=("1,5,10,20")
+		options=("1","5","10","20")
 		w = tk.OptionMenu(config_window, self.gap_limit, *options,command=self.apply_config)
 		w.grid(row=2,column=1,sticky="w")
 
