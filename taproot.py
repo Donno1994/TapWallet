@@ -140,9 +140,7 @@ def sign_output_with_all_keys(taprootObject,privkey_list,spending_tx,input_tx,sc
             input_tx_counter+=1
 
     spending_tx_str = spending_tx.serialize().hex()
-    rawtxs=[spending_tx_str]
-        
-    return rawtxs[0]
+    return spending_tx_str
 
 def signTX(taprootObject,privkey_list,spending_tx,input_tx,script_list=None,address_index_from_short_list=False):
     input_tx_counter=0
@@ -181,9 +179,7 @@ def signTX(taprootObject,privkey_list,spending_tx,input_tx,script_list=None,addr
             input_tx_counter+=1
 
     spending_tx_str = spending_tx.serialize().hex()
-    rawtxs=[spending_tx_str]
-        
-    return rawtxs[0]
+    return spending_tx_str
 
 
 def SpendTransactionViaKeyPath(taprootObject,privkey_list,destination_list,change_amount=0,address_index_from_short_list=False):
